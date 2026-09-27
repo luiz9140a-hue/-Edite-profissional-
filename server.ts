@@ -30,7 +30,7 @@ function normalizeAssets(input: unknown): ProjectAsset[] {
   });
 }
 
-export async function createApp({ withVite = false } = {}) {
+export async function createApp() {
   const app = express();
   app.use(express.json({ limit: '50mb' }));
 
@@ -419,25 +419,5 @@ export async function createApp({ withVite = false } = {}) {
     res.json(report);
   });
 
-  // --- Vite Middleware Mounting (development only) ---
-  if (withVite) {
-    const { createServer } = await import('vite');
-    const vite = await createServer({
-      server: { middlewareMode: true },
-      appType: 'spa'
-    });
-    app.use(vite.middlewares);
-  }
   return app;
-}
-
-if (process.env.VERCEL !== '1') {
-  createApp({ withVite: true }).then(app => {
-    const port = 3000;
-    app.listen(port, () => {
-      console.log(`Engrenagem AI Dev Server operacional na porta ${port}`);
-    });
-  }).catch(err => {
-    console.error('Falha ao iniciar o servidor Engrenagem AI:', err);
-  });
 }
