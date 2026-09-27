@@ -113,7 +113,12 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#07090E] text-slate-100 flex flex-col justify-between selection:bg-blue-600 selection:text-white">
+    <div className="relative min-h-screen overflow-hidden bg-[#07090E] text-slate-100 flex flex-col justify-between selection:bg-blue-600 selection:text-white">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-0 overflow-hidden">
+        <div className="absolute left-1/2 top-[-18rem] h-[34rem] w-[55rem] -translate-x-1/2 rounded-full bg-blue-600/10 blur-3xl" />
+        <div className="absolute bottom-[-20rem] right-[-10rem] h-[32rem] w-[32rem] rounded-full bg-cyan-500/5 blur-3xl" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
+      </div>
       {/* Top Navbar */}
       <nav className="border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-md px-6 py-4 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center space-x-3">
@@ -148,7 +153,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Main Hero & Command Center */}
-      <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-12 max-w-4xl mx-auto w-full text-center">
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-12 max-w-4xl mx-auto w-full text-center">
         {/* Badge */}
         <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 text-blue-400 px-4 py-1.5 rounded-full text-xs font-semibold mb-6 shadow-sm">
           <Sparkles className="w-3.5 h-3.5 text-blue-400" />

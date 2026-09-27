@@ -22,12 +22,15 @@ import { IntentAnalyzer } from '../project-forge/IntentAnalyzer.ts';
 import { ProjectClassifier } from '../project-forge/ProjectClassifier.ts';
 import { ProjectBrainManager } from '../project-forge/ProjectBrainManager.ts';
 import { generateAiVisual, shouldGenerateAiVisual } from '../../server/visual/imageGenerationProvider.ts';
+import { getJob as getPersistedJob, getProject as getPersistedProject, saveJob, saveProject } from '../../server/persistence/firestoreStore.ts';
 
 export class JobEngine {
   private jobs: Map<string, GenerationJob> = new Map();
   private projects: Map<string, Project> = new Map();
   private plans: Map<string, ProjectPlan> = new Map();
   private previewHtmlCache: Map<string, string> = new Map();
+  private completions: Map<string, Promise<GenerationJob | undefined>> = new Map();
+  private completionResolvers: Map<string, (job: GenerationJob | undefined) => void> = new Map();
 
   constructor() {
     const baseDir = process.env.VERCEL === '1'
@@ -44,6 +47,34 @@ export class JobEngine {
 
   public getProject(id: string): Project | undefined {
     return this.projects.get(id);
+  }
+
+  public async loadJob(id: string): Promise<GenerationJob | undefined> {
+    const cached = this.jobs.get(id);
+    if (cached) return cached;
+    const persisted = await getPersistedJob(id);
+    if (persisted) this.jobs.set(id, persisted);
+    return persisted || undefined;
+  }
+
+  public async loadProject(id: string): Promise<Project | undefined> {
+    const cached = this.projects.get(id);
+    if (cached) return cached;
+    const persisted = await getPersistedProject(id);
+    if (persisted) this.projects.set(id, persisted);
+    return persisted || undefined;
+  }
+
+  public waitForJob(id: string): Promise<GenerationJob | undefined> {
+    const current = this.jobs.get(id);
+    if (current?.status === 'READY' || current?.status === 'FAILED' || current?.status === 'CANCELLED') {
+      return Promise.resolve(current);
+    }
+    const existing = this.completions.get(id);
+    if (existing) return existing;
+    const completion = new Promise<GenerationJob | undefined>(resolve => this.completionResolvers.set(id, resolve));
+    this.completions.set(id, completion);
+    return completion;
   }
 
   public getPlan(projectId: string): ProjectPlan | undefined {
@@ -169,11 +200,14 @@ export class JobEngine {
 
     this.projects.set(projectId, project);
     this.jobs.set(jobId, job);
+    void saveProject(project);
+    void saveJob(job);
+    this.waitForJob(jobId);
 
     eventEngine.emit(projectId, jobId, 'JOB_CREATED', { prompt, projectId });
 
     // Execute asynchronous lifecycle
-    this.executeJobLifecycle(jobId, projectId, prompt);
+    void this.executeJobLifecycle(jobId, projectId, prompt);
 
     return { project, job };
   }
@@ -216,8 +250,11 @@ export class JobEngine {
     project.activeJobId = jobId;
     project.status = 'QUEUED';
     this.jobs.set(jobId, job);
+    void saveProject(project);
+    void saveJob(job);
+    this.waitForJob(jobId);
 
-    this.executeJobLifecycle(jobId, projectId, message, true);
+    void this.executeJobLifecycle(jobId, projectId, message, true);
 
     return job;
   }
@@ -456,6 +493,13 @@ export class JobEngine {
       eventEngine.emit(projectId, jobId, 'PROJECT_FAILED', { error: job.error });
       addLog('error', `[JobEngine] Erro fatal: ${job.error}`, 'FAILED');
       project.status = 'FAILED';
+    } finally {
+      job.updatedAt = new Date().toISOString();
+      project.updatedAt = job.updatedAt;
+      await Promise.allSettled([saveJob(job), saveProject(project)]);
+      this.completionResolvers.get(jobId)?.(job);
+      this.completionResolvers.delete(jobId);
+      this.completions.delete(jobId);
     }
   }
 

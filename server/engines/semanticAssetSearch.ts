@@ -17,7 +17,10 @@ export async function searchRealVisualAssets(intent: IntentContract): Promise<{ 
     url.searchParams.set('action', 'query'); url.searchParams.set('generator', 'search'); url.searchParams.set('gsrsearch', queryFor(intent));
     url.searchParams.set('gsrnamespace', '6'); url.searchParams.set('gsrlimit', '10'); url.searchParams.set('prop', 'imageinfo');
     url.searchParams.set('iiprop', 'url|size'); url.searchParams.set('iiurlwidth', '1200'); url.searchParams.set('format', 'json');
-    const response = await fetch(url, { headers: { 'User-Agent': 'EngrenagemAI/1.0 (visual-asset-research; contact-admin)' } });
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'EngrenagemAI/1.0 (visual-asset-research; contact-admin)' },
+      signal: AbortSignal.timeout(8000)
+    });
     if (!response.ok) throw new Error(`Wikimedia Commons respondeu ${response.status}`);
     const data = await response.json() as { query?: { pages?: Record<string, { pageid: number; title: string; imageinfo?: Array<{ thumburl?: string; width?: number; height?: number; descriptionurl?: string }> }> } };
     const remote = Object.values(data.query?.pages || {}).map((page, index) => {

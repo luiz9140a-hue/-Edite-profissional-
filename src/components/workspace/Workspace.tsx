@@ -36,6 +36,7 @@ import PreviewStage from '../preview/PreviewStage';
 import MobileWorkspaceNavigation, { MobileTab } from './MobileWorkspaceNavigation';
 import ProjectFilesList from './ProjectFilesList';
 import ProjectAssetLibrary from './ProjectAssetLibrary';
+import { useAuth } from '../../auth/AuthContext';
 
 export default function Workspace() {
   return (
@@ -48,6 +49,11 @@ export default function Workspace() {
 function WorkspaceContent() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user, isAdmin } = useAuth();
+  const accountHeaders = {
+    'x-account-id': user?.uid || 'anonymous',
+    'x-plan-id': isAdmin ? 'admin_lifetime' : 'free'
+  };
   const projectIdParam = searchParams.get('project');
   const jobIdParam = searchParams.get('job');
 
@@ -162,7 +168,7 @@ function WorkspaceContent() {
     try {
       const res = await fetch('/api/generation/jobs', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...accountHeaders },
         body: JSON.stringify({
           prompt: 'Crie um site premium para uma hamburgueria chamada Burger House, com cardápio, carrinho e botão de WhatsApp.'
         })
@@ -184,7 +190,7 @@ function WorkspaceContent() {
     try {
       const res = await fetch('/api/bud/run', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...accountHeaders },
         body: JSON.stringify({
           projectId: project.id,
           message: msg

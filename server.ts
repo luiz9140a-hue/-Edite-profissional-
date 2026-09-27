@@ -65,7 +65,7 @@ export async function createApp() {
   });
 
   // 1. Create a new Generation Job / Project
-  app.post('/api/generation/jobs', (req, res) => {
+  app.post('/api/generation/jobs', async (req, res) => {
     try {
       const { prompt, projectId, assets = [] } = req.body;
       if (!prompt || typeof prompt !== 'string') {
@@ -81,13 +81,16 @@ export async function createApp() {
 
       const safeAssets = normalizeAssets(assets);
       const { project, job } = jobEngine.createJob(prompt, projectId, safeAssets);
+      const completedJob = await jobEngine.waitForJob(job.id);
+      const completedProject = await jobEngine.loadProject(project.id);
       res.setHeader('X-Credits-Charged', String(reservation.charged));
       res.setHeader('X-Credits-Remaining', String(reservation.remaining));
       res.json({
         jobId: job.id,
         projectId: project.id,
-        status: job.status,
-        project
+        status: completedJob?.status || job.status,
+        job: completedJob || job,
+        project: completedProject || project
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message || 'Erro ao criar job.' });
@@ -95,8 +98,8 @@ export async function createApp() {
   });
 
   // 2. Query status of a Generation Job
-  app.get('/api/generation/jobs/:id', (req, res) => {
-    const job = jobEngine.getJob(req.params.id);
+  app.get('/api/generation/jobs/:id', async (req, res) => {
+    const job = await jobEngine.loadJob(req.params.id);
     if (!job) {
       return res.status(404).json({ error: 'Job não encontrado.' });
     }
@@ -118,14 +121,14 @@ export async function createApp() {
   });
 
   // 5. BUD Chat / Command execution on existing project
-  app.post('/api/bud/run', (req, res) => {
+  app.post('/api/bud/run', async (req, res) => {
     try {
       const { projectId, message } = req.body;
       if (!projectId || !message) {
         return res.status(400).json({ error: 'projectId e message são obrigatórios.' });
       }
 
-      const project = jobEngine.getProject(projectId);
+      const project = await jobEngine.loadProject(projectId);
       if (!project) {
         return res.status(404).json({ error: 'Projeto não encontrado.' });
       }
@@ -136,10 +139,12 @@ export async function createApp() {
       if (!reservation.allowed) return res.status(429).json({ error: 'Créditos diários insuficientes para editar este projeto.', usage: getApiUsage(uid, planId) });
 
       const job = jobEngine.runEdit(projectId, message);
+      const completedJob = await jobEngine.waitForJob(job.id);
       res.json({
         jobId: job.id,
         projectId,
-        status: job.status
+        status: completedJob?.status || job.status,
+        job: completedJob || job
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message || 'Erro ao processar comando com BUD.' });

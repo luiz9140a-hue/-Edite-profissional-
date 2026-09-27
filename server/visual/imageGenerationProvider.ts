@@ -15,6 +15,7 @@ export async function generateAiVisual(prompt: string, intentSummary: string): P
   const visualPrompt = `Create one high-quality website hero image. ${intentSummary}. User visual request: ${prompt}. Photorealistic commercial photography or physically plausible 3D product render only when requested. Match the requested industry, subject, lighting, composition and color palette. No logos, no invented text, no watermarks, no generic clipart, no cartoon, no placeholder, no UI screenshot.`;
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(20000),
     body: JSON.stringify({ contents: [{ parts: [{ text: visualPrompt }] }], generationConfig: { responseModalities: ['IMAGE', 'TEXT'] } })
   });
   if (!response.ok) throw new Error(`Gemini Image respondeu ${response.status}`);
