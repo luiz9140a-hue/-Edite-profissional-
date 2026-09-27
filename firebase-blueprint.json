@@ -1,0 +1,50 @@
+{
+  "entities": {
+    "GenerationJob": {
+      "title": "GenerationJob",
+      "description": "A generation job executed by BUD agent engine",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["QUEUED", "ANALYZING", "PLANNING", "RESEARCHING", "EXECUTING", "BUILDING", "TESTING", "QA", "REPAIRING", "READY", "FAILED", "CANCELLED"]
+        },
+        "prompt": { "type": "string" },
+        "currentStep": { "type": "string" },
+        "progress": { "type": "number" },
+        "logs": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "projectId", "status", "prompt"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Project created and managed by Engrenagem AI and BUD",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string" },
+        "intentContract": { "type": "string" },
+        "readiness": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "status"]
+    }
+  },
+  "firestore": {
+    "/generation_jobs/{jobId}": {
+      "schema": { "$ref": "#/entities/GenerationJob" },
+      "description": "Collection of all generation jobs"
+    },
+    "/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/Project" },
+      "description": "Collection of all projects"
+    }
+  }
+}

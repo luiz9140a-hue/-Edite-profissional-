@@ -1,0 +1,48 @@
+{
+  "projectType": "delivery",
+  "businessType": "hamburgueria_artesanal",
+  "businessName": "Burger House",
+  "domain": "food_delivery",
+  "targetAudience": "Clientes exigentes e usuários digitais",
+  "primaryGoal": "Converter visitantes em clientes e otimizar operações",
+  "requiredFeatures": [
+    "Cardápio Interativo com Categorias",
+    "Carrinho de Compras em Tempo Real",
+    "Botão de Pedido Direto via WhatsApp",
+    "Seleção de Adicionais e Ponto da Carne",
+    "Informações de Entrega e Horários"
+  ],
+  "visualConcepts": [
+    "artesanal",
+    "apetitoso",
+    "dark_theme",
+    "hambúrguer suculento",
+    "fogo e grelha"
+  ],
+  "requiredAssets": [
+    "burgers",
+    "french_fries",
+    "craft_soda",
+    "chef_grill",
+    "delivery_bag"
+  ],
+  "forbiddenAssets": [
+    "medical",
+    "hospital",
+    "dentist",
+    "clinic",
+    "pharma",
+    "gym",
+    "carvão_industrial"
+  ],
+  "colorPalette": {
+    "primary": "#F97316",
+    "secondary": "#1C1917",
+    "accent": "#EAB308",
+    "background": "#0C0A09",
+    "text": "#FAFAF9"
+  },
+  "responsiveRequired": true,
+  "mobileRequired": true,
+  "desktopRequired": true
+}
