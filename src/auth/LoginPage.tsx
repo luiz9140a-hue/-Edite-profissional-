@@ -3,6 +3,20 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Github, Chrome, LockKeyhole, Sparkles } from 'lucide-react';
 import { useAuth } from './AuthContext';
 
+function firebaseLoginError(err: any): string {
+  const code = String(err?.code || '');
+  const messages: Record<string, string> = {
+    'auth/unauthorized-domain': 'Este domínio ainda não está autorizado no Firebase. Adicione o domínio da Vercel em Authentication → Settings → Authorized domains.',
+    'auth/operation-not-allowed': 'O login com Google ainda não está habilitado no Firebase Authentication.',
+    'auth/popup-blocked': 'O navegador bloqueou a janela de login. Permita pop-ups para este site e tente novamente.',
+    'auth/popup-closed-by-user': 'A janela de login foi fechada antes da conclusão.',
+    'auth/network-request-failed': 'Não foi possível conectar ao Firebase. Verifique sua internet e tente novamente.',
+    'auth/account-exists-with-different-credential': 'Já existe uma conta com este e-mail usando outro método de login.'
+  };
+  if (messages[code]) return messages[code];
+  return err?.message || 'Não foi possível entrar. Verifique seus dados e tente novamente.';
+}
+
 export default function LoginPage() {
   const { user, loading, signInGoogle, signInGithub, signInEmail } = useAuth();
   const navigate = useNavigate();
@@ -21,7 +35,7 @@ export default function LoginPage() {
   const run = async (action: () => Promise<void>) => {
     setBusy(true); setError('');
     try { await action(); navigate(destination, { replace: true }); }
-    catch (err: any) { setError(err?.message || 'Não foi possível entrar. Verifique seus dados.'); }
+    catch (err: any) { setError(firebaseLoginError(err)); }
     finally { setBusy(false); }
   };
 
