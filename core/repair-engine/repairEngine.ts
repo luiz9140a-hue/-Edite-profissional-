@@ -1,4 +1,4 @@
-import { ProjectFile } from '../../src/types/engrenagem';
+import { ProjectFile } from '../../src/types/engrenagem.ts';
 
 export interface RepairAttempt {
   attemptNumber: number;

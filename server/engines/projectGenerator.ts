@@ -1,6 +1,6 @@
-import { IntentContract, ProjectFile, ProjectAsset } from '../../src/types/engrenagem';
-import { VerifiedAsset } from './semanticAssetGuard';
-import { FunctionalFeaturePlanner } from '../../core/project-forge/FunctionalFeaturePlanner';
+import { IntentContract, ProjectFile, ProjectAsset } from '../../src/types/engrenagem.ts';
+import { VerifiedAsset } from './semanticAssetGuard.ts';
+import { FunctionalFeaturePlanner } from '../../core/project-forge/FunctionalFeaturePlanner.ts';
 
 export function generateProjectFiles(
   intent: IntentContract,

@@ -1,4 +1,4 @@
-import { getPlan, PlanId } from './planCatalog';
+import { getPlan, PlanId } from './planCatalog.ts';
 
 export interface AccountEntitlement {
   uid: string;

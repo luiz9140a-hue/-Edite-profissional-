@@ -1,4 +1,4 @@
-import { IntentContract } from '../../src/types/engrenagem';
+import { IntentContract } from '../../src/types/engrenagem.ts';
 
 export interface VerifiedAsset {
   id: string;

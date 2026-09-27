@@ -1,4 +1,4 @@
-import { interactionRegistry } from './interactionRegistry';
+import { interactionRegistry } from './interactionRegistry.ts';
 
 export interface AuditItem {
   id: string;

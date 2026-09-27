@@ -1,4 +1,4 @@
-import { IntentContract, ProjectFile, ProjectReadiness, QAResult, ResponsiveBreakpointsQA } from '../../src/types/engrenagem';
+import { IntentContract, ProjectFile, ProjectReadiness, QAResult, ResponsiveBreakpointsQA } from '../../src/types/engrenagem.ts';
 
 export function runComprehensiveQA(
   intent: IntentContract,

@@ -1,4 +1,4 @@
-import { getPlan } from './planCatalog';
+import { getPlan } from './planCatalog.ts';
 
 export type ApiProvider = 'bud_generation' | 'nominatim_leads' | 'overpass_places' | 'deployment';
 const usage = new Map<string, { day: string; total: number; byProvider: Record<string, number> }>();

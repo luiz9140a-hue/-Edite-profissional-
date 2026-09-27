@@ -1,4 +1,4 @@
-import { RESPONSIVE_BREAKPOINTS, BreakpointConfig } from './ResponsiveRules';
+import { RESPONSIVE_BREAKPOINTS, BreakpointConfig } from './ResponsiveRules.ts';
 
 export type DeviceCategory = 'mobile' | 'tablet' | 'desktop';
 

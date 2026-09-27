@@ -1,4 +1,4 @@
-import { eventEngine } from '../event-engine/eventEngine';
+import { eventEngine } from '../event-engine/eventEngine.ts';
 
 export type PreviewStatus = 'STOPPED' | 'STARTING' | 'RUNNING' | 'RESTARTING' | 'CRASHED' | 'ERROR';
 

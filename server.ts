@@ -1,20 +1,20 @@
 import express from 'express';
 import { createServer } from 'vite';
-import { jobEngine } from './core/bud/JobEngine';
-import { providerRouter } from './core/provider-router/providerRouter';
-import { toolRegistry } from './core/tool-registry/toolRegistry';
-import { sandboxManager } from './infrastructure/sandbox/sandboxManager';
-import { previewManager } from './core/preview-engine/PreviewManager';
-import { interactiveAuditEngine } from './core/interaction-registry/interactiveAuditEngine';
-import { commandRouter } from './core/bud/CommandRouter';
-import { githubProvider } from './core/providers/githubProvider';
-import { deploymentProvider } from './core/providers/deploymentProvider';
-import { runComprehensiveQA } from './server/engines/qaEngine';
-import { runBudIntake, IntakeMessage } from './core/bud/budIntake';
-import { PLAN_CATALOG } from './server/billing/planCatalog';
-import { reserveApiCredits, getApiUsage } from './server/billing/apiCreditLedger';
-import { searchPublicLeads } from './server/leads/leadSearchProvider';
-import { ProjectAsset, ProjectAssetKind } from './src/types/engrenagem';
+import { jobEngine } from './core/bud/JobEngine.ts';
+import { providerRouter } from './core/provider-router/providerRouter.ts';
+import { toolRegistry } from './core/tool-registry/toolRegistry.ts';
+import { sandboxManager } from './infrastructure/sandbox/sandboxManager.ts';
+import { previewManager } from './core/preview-engine/PreviewManager.ts';
+import { interactiveAuditEngine } from './core/interaction-registry/interactiveAuditEngine.ts';
+import { commandRouter } from './core/bud/CommandRouter.ts';
+import { githubProvider } from './core/providers/githubProvider.ts';
+import { deploymentProvider } from './core/providers/deploymentProvider.ts';
+import { runComprehensiveQA } from './server/engines/qaEngine.ts';
+import { runBudIntake, IntakeMessage } from './core/bud/budIntake.ts';
+import { PLAN_CATALOG } from './server/billing/planCatalog.ts';
+import { reserveApiCredits, getApiUsage } from './server/billing/apiCreditLedger.ts';
+import { searchPublicLeads } from './server/leads/leadSearchProvider.ts';
+import { ProjectAsset, ProjectAssetKind } from './src/types/engrenagem.ts';
 
 function normalizeAssets(input: unknown): ProjectAsset[] {
   if (!Array.isArray(input)) return [];

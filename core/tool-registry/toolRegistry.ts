@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { sandboxManager } from '../../infrastructure/sandbox/sandboxManager';
-import { providerRouter } from '../provider-router/providerRouter';
+import { sandboxManager } from '../../infrastructure/sandbox/sandboxManager.ts';
+import { providerRouter } from '../provider-router/providerRouter.ts';
 
 export interface ToolDefinition {
   name: string;

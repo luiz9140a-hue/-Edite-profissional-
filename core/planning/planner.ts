@@ -1,5 +1,5 @@
-import { IntentContract } from '../../src/types/engrenagem';
-import { createSupremeBuildGraph, SupremeBuildGraph } from '../supreme-build/SupremeBuildOrchestrator';
+import { IntentContract } from '../../src/types/engrenagem.ts';
+import { createSupremeBuildGraph, SupremeBuildGraph } from '../supreme-build/SupremeBuildOrchestrator.ts';
 
 export interface TaskNode {
   id: string;

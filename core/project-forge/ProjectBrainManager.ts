@@ -1,4 +1,4 @@
-import { ProjectBrain, IntentContract } from '../../src/types/engrenagem';
+import { ProjectBrain, IntentContract } from '../../src/types/engrenagem.ts';
 
 export class ProjectBrainManager {
   public static createBrain(projectId: string, request: string, intent: IntentContract): ProjectBrain {

@@ -9,19 +9,19 @@ import {
   ProjectBrain,
   ProjectReadiness,
   ProjectAsset
-} from '../../src/types/engrenagem';
-import { searchRealVisualAssets } from '../../server/engines/semanticAssetSearch';
-import { generateProjectFiles } from '../../server/engines/projectGenerator';
-import { runComprehensiveQA } from '../../server/engines/qaEngine';
-import { sandboxManager } from '../../infrastructure/sandbox/sandboxManager';
-import { eventEngine } from '../event-engine/eventEngine';
-import { planner, ProjectPlan } from '../planning/planner';
-import { repairEngine } from '../repair-engine/repairEngine';
-import { commandRouter, RoutedCommand } from './CommandRouter';
-import { IntentAnalyzer } from '../project-forge/IntentAnalyzer';
-import { ProjectClassifier } from '../project-forge/ProjectClassifier';
-import { ProjectBrainManager } from '../project-forge/ProjectBrainManager';
-import { generateAiVisual, shouldGenerateAiVisual } from '../../server/visual/imageGenerationProvider';
+} from '../../src/types/engrenagem.ts';
+import { searchRealVisualAssets } from '../../server/engines/semanticAssetSearch.ts';
+import { generateProjectFiles } from '../../server/engines/projectGenerator.ts';
+import { runComprehensiveQA } from '../../server/engines/qaEngine.ts';
+import { sandboxManager } from '../../infrastructure/sandbox/sandboxManager.ts';
+import { eventEngine } from '../event-engine/eventEngine.ts';
+import { planner, ProjectPlan } from '../planning/planner.ts';
+import { repairEngine } from '../repair-engine/repairEngine.ts';
+import { commandRouter, RoutedCommand } from './CommandRouter.ts';
+import { IntentAnalyzer } from '../project-forge/IntentAnalyzer.ts';
+import { ProjectClassifier } from '../project-forge/ProjectClassifier.ts';
+import { ProjectBrainManager } from '../project-forge/ProjectBrainManager.ts';
+import { generateAiVisual, shouldGenerateAiVisual } from '../../server/visual/imageGenerationProvider.ts';
 
 export class JobEngine {
   private jobs: Map<string, GenerationJob> = new Map();

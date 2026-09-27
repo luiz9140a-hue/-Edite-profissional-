@@ -1,5 +1,5 @@
-import { IntentContract } from '../../src/types/engrenagem';
-import { validateAndGetSemanticAssets, VerifiedAsset } from './semanticAssetGuard';
+import { IntentContract } from '../../src/types/engrenagem.ts';
+import { validateAndGetSemanticAssets, VerifiedAsset } from './semanticAssetGuard.ts';
 
 const BLOCKED_TERMS = ['placeholder', 'logo', 'icon', 'clipart', 'cartoon', 'drawing', 'illustration', 'diagram', 'screenshot', 'template', 'vector'];
 

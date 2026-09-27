@@ -1,4 +1,4 @@
-import { IntentContract } from '../../src/types/engrenagem';
+import { IntentContract } from '../../src/types/engrenagem.ts';
 
 export function analyzeIntent(prompt: string, currentContract?: IntentContract): IntentContract {
   const p = prompt.toLowerCase();

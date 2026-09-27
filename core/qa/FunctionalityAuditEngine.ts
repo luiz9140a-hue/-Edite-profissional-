@@ -1,4 +1,4 @@
-import { AuditItem } from '../interaction-registry/interactiveAuditEngine';
+import { AuditItem } from '../interaction-registry/interactiveAuditEngine.ts';
 
 export interface FunctionalityAuditReport {
   totalFeatures: number;
