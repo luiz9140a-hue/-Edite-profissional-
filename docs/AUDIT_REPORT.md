@@ -1,7 +1,7 @@
 # Relatório de auditoria — Engrenagem AI
 
 **Branch:** `fix/firebase-vercel`  
-**Commit:** `caceeda`  
+**Commits:** `caceeda` (correções) e `b7703b6` (relatório)  
 **Data:** 2026-09-27
 
 ## Resultado
