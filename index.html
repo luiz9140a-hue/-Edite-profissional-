@@ -1,18 +1,112 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Engrenagem AI — BUD Creation Engine</title>
-    <meta name="description" content="Você explica. O BUD constrói. Plataforma autônoma de criação de software por linguagem natural." />
-    <meta property="og:title" content="Engrenagem AI — BUD Creation Engine" />
-    <meta property="og:description" content="Você explica. O BUD constrói. Plataforma autônoma de criação de software por linguagem natural." />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edite Profissional</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module">
+    // 🔧 FIREBASE — DADOS DO SEU PROJETO NOVO ✅
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
+    const firebaseConfig = {
+      apiKey: "AIzaSyBZ877ToGxUbri6JMkjJPSG6QqcwZShygk",
+      authDomain: "edite-profissional.firebaseapp.com",
+      projectId: "edite-profissional",
+      storageBucket: "edite-profissional.firebasestorage.app",
+      messagingSenderId: "19696679233",
+      appId: "1:19696679233:web:3fd43455fd551b637689c0"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+
+    // 🔐 LOGIN
+    window.loginGoogle = async function() {
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (e) {
+        console.error("Erro login:", e);
+        alert("Não foi possível entrar. Tente novamente.");
+      }
+    };
+
+    // 🚪 SAIR
+    window.sair = async function() {
+      await signOut(auth);
+    };
+
+    // 👤 MONITORAR USUÁRIO
+    onAuthStateChanged(auth, async (user) => {
+      const telaLogin = document.getElementById('tela-login');
+      const telaApp = document.getElementById('tela-app');
+      const nomeUsuario = document.getElementById('nome-usuario');
+
+      if (user) {
+        // Entrou
+        telaLogin.classList.add('hidden');
+        telaApp.classList.remove('hidden');
+        nomeUsuario.textContent = user.displayName || user.email;
+
+        // Salvar/pegar dados no banco
+        const refUsuario = doc(db, "usuarios", user.uid);
+        const snap = await getDoc(refUsuario);
+        
+        if (!snap.exists()) {
+          // Primeiro acesso — criar perfil
+          await setDoc(refUsuario, {
+            nome: user.displayName || "",
+            email: user.email,
+            criadoEm: new Date()
+          });
+          console.log("Perfil criado no banco ✅");
+        }
+      } else {
+        // Desconectado
+        telaLogin.classList.remove('hidden');
+        telaApp.classList.add('hidden');
+      }
+    });
+  </script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- TELA DE LOGIN -->
+  <div id="tela-login" class="flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
+      <h1 class="text-3xl font-bold text-gray-800 mb-2">Edite Profissional</h1>
+      <p class="text-gray-500 mb-8">Faça login para acessar</p>
+      
+      <button onclick="loginGoogle()" 
+        class="flex items-center justify-center gap-3 w-full py-3 px-4 border border-gray-300 rounded-xl hover:bg-gray-50 transition font-medium">
+        <svg class="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Entrar com Google
+      </button>
+    </div>
+  </div>
+
+  <!-- TELA PRINCIPAL DEPOIS DO LOGIN -->
+  <div id="tela-app" class="hidden p-6 max-w-4xl mx-auto">
+    <div class="flex justify-between items-center mb-8">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-800">Edite Profissional</h1>
+        <p class="text-gray-500">Bem-vindo, <span id="nome-usuario" class="font-medium"></span>!</p>
+      </div>
+      <button onclick="sair()" 
+        class="bg-red-50 text-red-600 px-4 py-2 rounded-lg hover:bg-red-100 transition">
+        Sair
+      </button>
+    </div>
+
+    <div class="bg-white rounded-xl shadow p-6">
+      <h2 class="text-xl font-semibold mb-4">✅ Sistema conectado!</h2>
+      <p class="text-green-600 mb-2">✓ Login funcionando</p>
+      <p class="text-green-600 mb-2">✓ Banco de dados conectado</p>
+      <p class="text-gray-500">Tudo pronto para usar! 🚀</p>
+    </div>
+  </div>
+</body>
+</html>
