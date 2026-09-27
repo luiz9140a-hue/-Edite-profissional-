@@ -1,5 +1,4 @@
 import express from 'express';
-import { createServer } from 'vite';
 import { jobEngine } from './core/bud/JobEngine.ts';
 import { providerRouter } from './core/provider-router/providerRouter.ts';
 import { toolRegistry } from './core/tool-registry/toolRegistry.ts';
@@ -422,6 +421,7 @@ export async function createApp({ withVite = false } = {}) {
 
   // --- Vite Middleware Mounting (development only) ---
   if (withVite) {
+    const { createServer } = await import('vite');
     const vite = await createServer({
       server: { middlewareMode: true },
       appType: 'spa'
