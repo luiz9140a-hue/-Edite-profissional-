@@ -20,7 +20,10 @@ export class SandboxManager {
   private blockedPatterns = [/rm\s+-rf\s+\//, /mkfs/, /dd\s+if=/, />\s*\/dev\//, /sudo/, /chmod\s+777/];
 
   public getWorkspaceDir(projectId: string): string {
-    const base = path.resolve(process.cwd(), 'workspace', 'projects', projectId);
+    const root = process.env.VERCEL === '1'
+      ? path.resolve('/tmp', 'engrenagem-workspace', 'projects')
+      : path.resolve(process.cwd(), 'workspace', 'projects');
+    const base = path.resolve(root, projectId);
     if (!fs.existsSync(base)) {
       fs.mkdirSync(base, { recursive: true });
     }

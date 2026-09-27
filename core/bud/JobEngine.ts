@@ -30,7 +30,9 @@ export class JobEngine {
   private previewHtmlCache: Map<string, string> = new Map();
 
   constructor() {
-    const baseDir = path.resolve(process.cwd(), 'workspace', 'projects');
+    const baseDir = process.env.VERCEL === '1'
+      ? path.resolve('/tmp', 'engrenagem-workspace', 'projects')
+      : path.resolve(process.cwd(), 'workspace', 'projects');
     if (!fs.existsSync(baseDir)) {
       fs.mkdirSync(baseDir, { recursive: true });
     }
