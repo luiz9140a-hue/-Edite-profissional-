@@ -40,16 +40,7 @@ export class ProviderRouter {
       requiredConfiguration: ['ANTIGRAVITY_API_KEY', 'ANTIGRAVITY_ENDPOINT']
     });
 
-    // 3. Database Provider (Firebase Firestore)
-    this.providers.set('firestore', {
-      name: 'Google Cloud Firestore',
-      category: 'Database',
-      status: 'AVAILABLE',
-      description: 'Banco de dados NoSQL persistente provisionado para o applet.',
-      details: 'Conectado ao banco: ai-studio-7fa20a56-606f-464b-b234-624869fa1b16'
-    });
-
-    // 4. GitHub Provider
+    // 3. GitHub Provider
     const hasGithub = !!process.env.GITHUB_TOKEN;
     this.providers.set('github', {
       name: 'GitHub Provider',
