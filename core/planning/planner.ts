@@ -1,4 +1,5 @@
 import { IntentContract } from '../../src/types/engrenagem';
+import { createSupremeBuildGraph, SupremeBuildGraph } from '../supreme-build/SupremeBuildOrchestrator';
 
 export interface TaskNode {
   id: string;
@@ -21,6 +22,7 @@ export interface ProjectPlan {
   };
   dependencies: Record<string, string>;
   tasks: TaskNode[];
+  executionGraph: SupremeBuildGraph;
 }
 
 export class Planner {
@@ -101,7 +103,8 @@ export class Planner {
         components
       },
       dependencies,
-      tasks
+      tasks,
+      executionGraph: createSupremeBuildGraph(intent)
     };
   }
 }

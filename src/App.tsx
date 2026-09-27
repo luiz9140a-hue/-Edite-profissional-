@@ -8,14 +8,19 @@ import LandingPage from './components/layout/LandingPage';
 import Workspace from './components/workspace/Workspace';
 import IsolatedPreviewPage from './components/preview/IsolatedPreviewPage';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import LoginPage from './auth/LoginPage';
+import RequireAuth from './auth/RequireAuth';
+import BeginnerLeadCoach from './components/beginner/BeginnerLeadCoach';
 
 export default function App() {
   return (
     <ErrorBoundary fallbackTitle="Engrenagem AI — Falha Recuperada">
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/workspace" element={<Workspace />} />
-        <Route path="/preview/:id" element={<IsolatedPreviewPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/workspace" element={<RequireAuth><Workspace /></RequireAuth>} />
+        <Route path="/beginner" element={<RequireAuth><BeginnerLeadCoach /></RequireAuth>} />
+        <Route path="/preview/:id" element={<RequireAuth><IsolatedPreviewPage /></RequireAuth>} />
       </Routes>
     </ErrorBoundary>
   );

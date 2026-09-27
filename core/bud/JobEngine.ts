@@ -7,9 +7,10 @@ import {
   LogEntry,
   Project,
   ProjectBrain,
-  ProjectReadiness
+  ProjectReadiness,
+  ProjectAsset
 } from '../../src/types/engrenagem';
-import { validateAndGetSemanticAssets } from '../../server/engines/semanticAssetGuard';
+import { searchRealVisualAssets } from '../../server/engines/semanticAssetSearch';
 import { generateProjectFiles } from '../../server/engines/projectGenerator';
 import { runComprehensiveQA } from '../../server/engines/qaEngine';
 import { sandboxManager } from '../../infrastructure/sandbox/sandboxManager';
@@ -20,6 +21,7 @@ import { commandRouter, RoutedCommand } from './CommandRouter';
 import { IntentAnalyzer } from '../project-forge/IntentAnalyzer';
 import { ProjectClassifier } from '../project-forge/ProjectClassifier';
 import { ProjectBrainManager } from '../project-forge/ProjectBrainManager';
+import { generateAiVisual, shouldGenerateAiVisual } from '../../server/visual/imageGenerationProvider';
 
 export class JobEngine {
   private jobs: Map<string, GenerationJob> = new Map();
@@ -90,7 +92,7 @@ export class JobEngine {
   /**
    * Main entrypoint for starting a generation job and creating a project
    */
-  public createJob(prompt: string, existingProjectId?: string): { project: Project; job: GenerationJob } {
+  public createJob(prompt: string, existingProjectId?: string, assets: ProjectAsset[] = []): { project: Project; job: GenerationJob } {
     const projectId = existingProjectId || ('proj-' + Math.random().toString(36).substring(2, 9));
     const jobId = 'job-' + Math.random().toString(36).substring(2, 9);
     const now = new Date().toISOString();
@@ -133,6 +135,7 @@ export class JobEngine {
       status: 'QUEUED',
       intent: initialIntent,
       files: {},
+      assets,
       readiness: initialReadiness,
       brain,
       activeJobId: jobId,
@@ -304,6 +307,8 @@ export class JobEngine {
       this.plans.set(projectId, plan);
       eventEngine.emit(projectId, jobId, 'PLAN_CREATED', { plan });
       addLog('agent', `[PlanningEngine] Arquitetura definida com ${plan.architecture.modules.length} módulos e ${plan.tasks.length} tarefas.`, 'PLANNING');
+      addLog('agent', `[SupremoBuild] ${plan.executionGraph.executors.length} executores ativados: ${plan.executionGraph.executors.map(executor => executor.name).join(' → ')}.`, 'PLANNING', 'SupremeBuildOrchestrator');
+      addLog('info', `[SupremoBuild] Stack: ${plan.executionGraph.stack.frontend} • ${plan.executionGraph.stack.backend} • ${plan.executionGraph.stack.database}. Gate: ${plan.executionGraph.acceptanceGate.join(' | ')}`, 'PLANNING', 'SupremeBuildOrchestrator');
       await this.sleep(300);
 
       // 3. RESEARCHING
@@ -311,11 +316,27 @@ export class JobEngine {
       job.status = 'RESEARCHING';
       job.progress = 45;
       job.currentStep = 'Pesquisando e validando biblioteca de ativos certificados...';
-      const { assets, rejectedReasons } = validateAndGetSemanticAssets(intent);
+      const researched = await searchRealVisualAssets(intent);
+      let assets = researched.assets;
+      const rejectedReasons = researched.rejectedReasons;
+      const source = researched.source;
       if (rejectedReasons.length > 0) {
         rejectedReasons.forEach(r => addLog('warn', r, 'RESEARCHING', 'SemanticAssetGuard'));
       }
-      addLog('info', `[SemanticAssetGuard] ${assets.length} ativos validados sem placeholders fictícios.`, 'RESEARCHING');
+      addLog('info', `[SemanticAssetGuard] ${assets.length} ativos reais validados sem placeholders fictícios. Fonte: ${source}.`, 'RESEARCHING');
+      if (shouldGenerateAiVisual(prompt)) {
+        try {
+          const generated = await generateAiVisual(prompt, `${intent.domain} / ${intent.businessType} / ${intent.visualConcepts.join(', ')}`);
+          if (generated) {
+            assets = [{ id: 'gemini-generated-hero', category: intent.domain, semanticTags: intent.visualConcepts, url: `data:${generated.mimeType};base64,${generated.base64}`, alt: `Visual realista gerado para ${intent.businessName}`, width: 1200, height: 800 }, ...assets];
+            addLog('success', `[VisualEngine] Hero visual gerado com ${generated.model} e aplicado ao preview.`, 'RESEARCHING', 'VisualEngine');
+          } else {
+            addLog('warn', '[VisualEngine] GEMINI_API_KEY ausente; usando biblioteca fotográfica verificada.', 'RESEARCHING', 'VisualEngine');
+          }
+        } catch (visualError: any) {
+          addLog('warn', `[VisualEngine] Geração visual falhou; fallback para fotos reais: ${visualError.message}`, 'RESEARCHING', 'VisualEngine');
+        }
+      }
       await this.sleep(300);
 
       // 4. EXECUTING (Filesystem Engine)
@@ -325,7 +346,7 @@ export class JobEngine {
       job.currentStep = 'Gravando arquivos reais no workspace local do projeto...';
       addLog('agent', `[ExecutionEngine] Criando código fonte e persistindo em /workspace/projects/${projectId}...`, 'EXECUTING');
 
-      const { files, previewHtml } = generateProjectFiles(intent, assets);
+      const { files, previewHtml } = generateProjectFiles(intent, assets, project.assets);
       project.files = files;
       this.previewHtmlCache.set(projectId, previewHtml);
 
@@ -387,21 +408,39 @@ export class JobEngine {
         if (repairResult.canRepair && repairResult.repairedFiles) {
           project.files = repairResult.repairedFiles;
           project.brain.repairAttempts++;
+          if (project.files['index.html']) {
+            this.previewHtmlCache.set(projectId, project.files['index.html'].content);
+          }
           addLog('info', `[RepairEngine] Patch aplicado com sucesso: ${repairResult.repairAttempt?.patchSummary}`, 'REPAIRING');
         }
       }
 
-      eventEngine.emit(projectId, jobId, 'QA_SUCCEEDED', { score: readiness.score });
+      // Sempre revalida os arquivos após um reparo. Nunca publica um projeto que ainda falha no QA.
+      const finalQA = runComprehensiveQA(intent, project.files, this.getPreviewHtml(projectId));
+      job.qaReport = finalQA.reports;
+      job.readiness = finalQA.readiness;
+      project.readiness = finalQA.readiness;
+      const finalReadiness = finalQA.readiness;
+      eventEngine.emit(projectId, jobId, finalReadiness.ready ? 'QA_SUCCEEDED' : 'QA_FAILED', { score: finalReadiness.score });
       await this.sleep(300);
 
       // 9. READY
       if (this.isCancelled(job)) return;
+      if (!finalReadiness.ready) {
+        job.status = 'FAILED';
+        job.progress = 100;
+        job.currentStep = 'Geração interrompida: o projeto ainda falha nas validações de QA.';
+        job.error = 'O projeto não passou em todas as validações obrigatórias.';
+        project.status = 'FAILED';
+        addLog('error', `[JobEngine] Projeto bloqueado antes da publicação: score ${finalReadiness.score}/100.`, 'FAILED');
+        return;
+      }
       job.status = 'READY';
       job.progress = 100;
-      job.currentStep = 'Construção concluída com sucesso! Sandbox operacional no preview.';
+      job.currentStep = 'Construção concluída com sucesso! Preview funcional disponível.';
       project.status = 'READY';
       eventEngine.emit(projectId, jobId, 'PROJECT_READY', { projectId });
-      addLog('success', `[JobEngine] Pipeline finalizado com pontuação ${readiness.score}/100.`, 'READY');
+      addLog('success', `[JobEngine] Pipeline finalizado com pontuação ${finalReadiness.score}/100.`, 'READY');
 
       project.brain.history.push({
         id: 'hist-' + Date.now(),

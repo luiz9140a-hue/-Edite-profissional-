@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../auth/AuthContext';
 import {
   Sparkles,
   ArrowRight,
@@ -12,36 +13,92 @@ import {
   CheckCircle2,
   Terminal,
   ShieldCheck,
-  Cpu
+  Cpu,
+  Paperclip,
+  X
 } from 'lucide-react';
+import { ProjectAsset, ProjectAssetKind } from '../../types/engrenagem';
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const [prompt, setPrompt] = useState('');
+  const { user, isAdmin, logout } = useAuth();
+  const [prompt, setPrompt] = useState(() => new URLSearchParams(window.location.search).get('prompt') || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeJobStatus, setActiveJobStatus] = useState<string | null>(null);
+  const [intakeMessages, setIntakeMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const [isDiscovery, setIsDiscovery] = useState(false);
+  const [uploadedAssets, setUploadedAssets] = useState<ProjectAsset[]>([]);
+
+  const handleAssetFiles = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []).slice(0, 8);
+    const next = await Promise.all(files.map(file => new Promise<ProjectAsset>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const kind: ProjectAssetKind = file.type.startsWith('video/') ? 'video' : file.type.startsWith('audio/') ? 'audio' : 'image';
+        resolve({ id: `upload-${Date.now()}-${file.name}`, name: file.name, kind, mimeType: file.type, size: file.size, dataUrl: String(reader.result), source: 'upload', createdAt: new Date().toISOString() });
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    })));
+    setUploadedAssets(prev => [...prev, ...next].slice(0, 8));
+    event.target.value = '';
+  };
+
+  const createJob = async (textToRun: string) => {
+    const res = await fetch('/api/generation/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-account-id': user?.uid || 'anonymous', 'x-plan-id': isAdmin ? 'admin_lifetime' : 'free' },
+      body: JSON.stringify({ prompt: textToRun, assets: uploadedAssets })
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || 'Falha ao iniciar geração');
+    }
+
+    const data = await res.json();
+    setActiveJobStatus('Analisando intenção e arquitetura...');
+    setTimeout(() => navigate(`/workspace?project=${data.projectId}&job=${data.jobId}`), 700);
+  };
 
   const startJob = async (inputPrompt?: string) => {
     const textToRun = inputPrompt || prompt;
     if (!textToRun.trim() || isSubmitting) return;
+    if (!user) {
+      navigate('/login', { state: { from: '/' } });
+      return;
+    }
 
     setIsSubmitting(true);
-    setActiveJobStatus('Iniciando o BUD Agent Engine...');
+    setActiveJobStatus(isDiscovery ? 'BUD está entendendo seus requisitos...' : 'Iniciando o BUD Agent Engine...');
 
     try {
-      const res = await fetch('/api/generation/jobs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: textToRun })
-      });
+      const looksLikeSaaS = /\b(saas|software|plataforma|sistema)\b/i.test(textToRun) || intakeMessages.length > 0;
+      if (looksLikeSaaS) {
+        const res = await fetch('/api/bud/intake', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: textToRun, history: intakeMessages })
+        });
+        if (!res.ok) throw new Error('Falha ao conversar com o BUD');
+        const data = await res.json();
+        setIntakeMessages(prev => [...prev, { role: 'user', content: textToRun }, { role: 'assistant', content: data.message }]);
+        setPrompt('');
+        if (data.status === 'QUESTION') {
+          setIsDiscovery(true);
+          setIsSubmitting(false);
+          setActiveJobStatus('BUD aguardando sua resposta...');
+          return;
+        }
+        setIsDiscovery(false);
+        await createJob(data.prompt || textToRun);
+        return;
+      }
 
-      if (!res.ok) throw new Error('Falha ao iniciar geração');
-      const data = await res.json();
-
-      setActiveJobStatus('Analisando intenção e arquitetura...');
-      setTimeout(() => {
-        navigate(`/workspace?project=${data.projectId}&job=${data.jobId}`);
-      }, 700);
+      await createJob(textToRun);
+      /* A navegação ocorre em createJob depois que o servidor aceita o pedido. */
+      /* Mantemos o estado de envio até a troca de tela para impedir jobs duplicados. */
+      return;
     } catch (err: any) {
       alert('Erro ao iniciar BUD: ' + err.message);
       setIsSubmitting(false);
@@ -50,6 +107,8 @@ export default function LandingPage() {
   };
 
   const handleShortcut = (shortcutText: string) => {
+    setIntakeMessages([]);
+    setIsDiscovery(false);
     setPrompt(shortcutText);
   };
 
@@ -72,16 +131,19 @@ export default function LandingPage() {
         </div>
 
         <div className="flex items-center space-x-4">
+          {user && <div className="hidden sm:block text-right"><div className="text-xs text-slate-200 max-w-[180px] truncate">{user.email}</div><div className="text-[10px] text-emerald-400">{isAdmin ? 'ADMIN • VITALÍCIO' : 'CONTA ATIVA'}</div></div>}
           <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full font-mono">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             Agent Engine Ativo
           </span>
           <button
-            onClick={() => navigate('/workspace')}
+            onClick={() => user ? navigate('/workspace') : navigate('/login')}
             className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-4 py-2 rounded-xl transition font-medium"
           >
-            Abrir Workspace
+            {user ? 'Abrir Workspace' : 'Entrar / Criar conta'}
           </button>
+          {user && <button onClick={() => navigate('/beginner')} className="hidden sm:inline-flex text-xs bg-blue-600/20 hover:bg-blue-600/30 text-blue-200 border border-blue-500/30 px-4 py-2 rounded-xl transition font-medium">Primeiro cliente</button>}
+          {user && <button onClick={() => logout()} className="text-xs text-slate-400 hover:text-white">Sair</button>}
         </div>
       </nav>
 
@@ -107,12 +169,22 @@ export default function LandingPage() {
 
         {/* Command Center Card */}
         <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-3 sm:p-4 shadow-2xl shadow-blue-950/20 backdrop-blur-xl relative">
+          {intakeMessages.length > 0 && (
+            <div className="mb-3 max-h-44 overflow-y-auto rounded-2xl border border-blue-500/20 bg-slate-950/70 p-3 text-left space-y-2">
+              <div className="text-[10px] uppercase tracking-wider text-blue-400 font-bold">Descoberta guiada pelo BUD</div>
+              {intakeMessages.map((item, index) => (
+                <div key={`${item.role}-${index}`} className={item.role === 'assistant' ? 'text-slate-300 text-xs' : 'text-blue-200 text-xs text-right'}>
+                  <span className="font-bold mr-1">{item.role === 'assistant' ? 'BUD:' : 'Você:'}</span>{item.content}
+                </div>
+              ))}
+            </div>
+          )}
           <div className="relative">
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               disabled={isSubmitting}
-              placeholder="Descreva o que você quer criar... Ex: Crie um site premium para uma hamburgueria chamada Burger House, com cardápio, carrinho e botão de WhatsApp."
+              placeholder={isDiscovery ? 'Responda à pergunta do BUD para continuar...' : 'Descreva o que você quer criar... Ex: Quero uma SaaS para academias com alunos, treinos e pagamentos.'}
               rows={3}
               className="w-full p-4 sm:p-5 rounded-2xl bg-slate-950/80 border border-slate-850 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm sm:text-base leading-relaxed resize-none transition"
               onKeyDown={(e) => {
@@ -124,18 +196,35 @@ export default function LandingPage() {
             />
           </div>
 
+          {uploadedAssets.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2 px-2">
+              {uploadedAssets.map(asset => (
+                <div key={asset.id} className="flex items-center gap-2 rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-200">
+                  <span>{asset.kind === 'video' ? 'Vídeo' : asset.kind === 'audio' ? 'Áudio' : 'Foto'} · {asset.name}</span>
+                  <button type="button" onClick={() => setUploadedAssets(prev => prev.filter(item => item.id !== asset.id))} aria-label={`Remover ${asset.name}`}><X className="w-3.5 h-3.5" /></button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-3 px-2">
             <div className="text-xs text-slate-500 font-mono hidden sm:flex items-center gap-2">
               <Terminal className="w-3.5 h-3.5 text-blue-400" />
               <span>Shift + Enter para quebra de linha</span>
             </div>
 
+            <label className="w-full sm:w-auto cursor-pointer border border-slate-700 hover:border-blue-400 text-slate-300 px-4 py-3.5 rounded-2xl text-sm flex items-center justify-center gap-2 transition">
+              <Paperclip className="w-4 h-4" />
+              <span>Anexar foto, vídeo ou áudio</span>
+              <input type="file" className="hidden" accept="image/*,video/*,audio/*" multiple onChange={handleAssetFiles} />
+            </label>
+
             <button
               onClick={() => startJob()}
               disabled={isSubmitting || !prompt.trim()}
               className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 disabled:opacity-50 text-white font-extrabold px-8 py-3.5 rounded-2xl text-sm flex items-center justify-center space-x-2 shadow-lg shadow-blue-600/30 transition transform active:scale-95"
             >
-              <span>{isSubmitting ? activeJobStatus : 'Construir com BUD'}</span>
+              <span>{isSubmitting ? activeJobStatus : isDiscovery ? 'Enviar resposta ao BUD' : 'Construir com BUD'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>

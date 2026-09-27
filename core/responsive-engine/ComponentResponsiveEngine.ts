@@ -40,7 +40,7 @@ export class ComponentResponsiveEngine {
         name: 'FormGrid',
         mobile: 'stack',
         tablet: 'grid_2col',
-        desktop: 'grid_2col'
+        desktop: 'grid_4col'
       }
     ],
     [

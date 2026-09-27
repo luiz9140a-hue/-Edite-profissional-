@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import './index.css';
+import { AuthProvider } from './auth/AuthContext';
 
 // Global error handlers to prevent unhandled exceptions from destroying the UI
 window.onerror = (message, source, lineno, colno, error) => {
@@ -19,8 +20,10 @@ window.onunhandledrejection = (event) => {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </AuthProvider>
   </StrictMode>,
 );

@@ -9,22 +9,81 @@ import { interactiveAuditEngine } from './core/interaction-registry/interactiveA
 import { commandRouter } from './core/bud/CommandRouter';
 import { githubProvider } from './core/providers/githubProvider';
 import { deploymentProvider } from './core/providers/deploymentProvider';
+import { runComprehensiveQA } from './server/engines/qaEngine';
+import { runBudIntake, IntakeMessage } from './core/bud/budIntake';
+import { PLAN_CATALOG } from './server/billing/planCatalog';
+import { reserveApiCredits, getApiUsage } from './server/billing/apiCreditLedger';
+import { searchPublicLeads } from './server/leads/leadSearchProvider';
+import { ProjectAsset, ProjectAssetKind } from './src/types/engrenagem';
+
+function normalizeAssets(input: unknown): ProjectAsset[] {
+  if (!Array.isArray(input)) return [];
+  const allowed = new Set<ProjectAssetKind>(['image', 'video', 'audio']);
+  return input.slice(0, 20).flatMap((raw: any) => {
+    const mimeType = typeof raw?.mimeType === 'string' ? raw.mimeType : '';
+    const dataUrl = typeof raw?.dataUrl === 'string' ? raw.dataUrl : '';
+    const kind = allowed.has(raw?.kind) ? raw.kind as ProjectAssetKind : mimeType.startsWith('video/') ? 'video' : mimeType.startsWith('audio/') ? 'audio' : 'image';
+    if (!/^data:(image|video|audio)\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+$/i.test(dataUrl) || !/^(image|video|audio)\//.test(mimeType)) return [];
+    const encoded = dataUrl.split(',')[1] || '';
+    const size = Number(raw?.size) || Math.floor(encoded.length * 0.75);
+    if (size <= 0 || size > 20 * 1024 * 1024) return [];
+    return [{ id: typeof raw.id === 'string' ? raw.id : `asset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, name: typeof raw.name === 'string' ? raw.name.slice(0, 120) : 'asset', kind, mimeType, size, dataUrl, source: 'upload', createdAt: new Date().toISOString() }];
+  });
+}
 
 async function startServer() {
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' }));
 
   // --- API Endpoints ---
+
+  // 0. Catálogo público da página de vendas
+  app.get('/api/billing/plans', (_req, res) => {
+    res.json({ plans: Object.values(PLAN_CATALOG).filter(plan => plan.id !== 'admin_lifetime') });
+  });
+
+  app.get('/api/billing/usage', (req, res) => {
+    const uid = String(req.headers['x-account-id'] || 'anonymous');
+    const planId = String(req.headers['x-plan-id'] || 'free');
+    res.json({ usage: getApiUsage(uid, planId), providers: { bud_generation: 'BUD / geração e edição', nominatim_leads: 'OpenStreetMap / busca de leads', overpass_places: 'OpenStreetMap / lugares', deployment: 'Publicação' } });
+  });
+
+  // Busca pública de negócios: Nominatim + cache + limite diário por conta.
+  app.get('/api/leads/search', async (req, res) => {
+    try {
+      const q = String(req.query.q || '');
+      const near = String(req.query.near || '');
+      const uid = String(req.headers['x-account-id'] || 'anonymous');
+      const reservation = reserveApiCredits(uid, String(req.headers['x-plan-id'] || 'free'), 'nominatim_leads', 2);
+      if (!reservation.allowed) return res.status(429).json({ error: 'Créditos diários insuficientes para esta busca.', usage: getApiUsage(uid, String(req.headers['x-plan-id'] || 'free')) });
+      const leads = await searchPublicLeads(q, near);
+      res.setHeader('X-Credits-Charged', String(reservation.charged));
+      res.setHeader('X-Credits-Remaining', String(reservation.remaining));
+      res.json({ provider: 'OpenStreetMap Nominatim', attribution: '© OpenStreetMap contributors', leads, usage: getApiUsage(uid, String(req.headers['x-plan-id'] || 'free')) });
+    } catch (err: any) {
+      res.status(502).json({ error: err.message || 'Não foi possível consultar a base pública de mapas.' });
+    }
+  });
 
   // 1. Create a new Generation Job / Project
   app.post('/api/generation/jobs', (req, res) => {
     try {
-      const { prompt, projectId } = req.body;
+      const { prompt, projectId, assets = [] } = req.body;
       if (!prompt || typeof prompt !== 'string') {
         return res.status(400).json({ error: 'Campo prompt é obrigatório.' });
       }
 
-      const { project, job } = jobEngine.createJob(prompt, projectId);
+      const uid = String(req.headers['x-account-id'] || 'anonymous');
+      const planId = String(req.headers['x-plan-id'] || 'free');
+      const reservation = reserveApiCredits(uid, planId, 'bud_generation', 5);
+      if (!reservation.allowed) {
+        return res.status(429).json({ error: 'Créditos diários insuficientes para gerar este projeto.', usage: getApiUsage(uid, planId) });
+      }
+
+      const safeAssets = normalizeAssets(assets);
+      const { project, job } = jobEngine.createJob(prompt, projectId, safeAssets);
+      res.setHeader('X-Credits-Charged', String(reservation.charged));
+      res.setHeader('X-Credits-Remaining', String(reservation.remaining));
       res.json({
         jobId: job.id,
         projectId: project.id,
@@ -72,6 +131,11 @@ async function startServer() {
         return res.status(404).json({ error: 'Projeto não encontrado.' });
       }
 
+      const uid = String(req.headers['x-account-id'] || 'anonymous');
+      const planId = String(req.headers['x-plan-id'] || 'free');
+      const reservation = reserveApiCredits(uid, planId, 'bud_generation', 1);
+      if (!reservation.allowed) return res.status(429).json({ error: 'Créditos diários insuficientes para editar este projeto.', usage: getApiUsage(uid, planId) });
+
       const job = jobEngine.runEdit(projectId, message);
       res.json({
         jobId: job.id,
@@ -81,6 +145,18 @@ async function startServer() {
     } catch (err: any) {
       res.status(500).json({ error: err.message || 'Erro ao processar comando com BUD.' });
     }
+  });
+
+  // 5a. Descoberta conversacional antes da criação de uma SaaS
+  app.post('/api/bud/intake', (req, res) => {
+    const { message, history = [] } = req.body as { message?: unknown; history?: IntakeMessage[] };
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Mensagem obrigatória.' });
+    }
+    if (!Array.isArray(history) || history.some(item => !item || !['user', 'assistant'].includes(item.role) || typeof item.content !== 'string')) {
+      return res.status(400).json({ error: 'Histórico de conversa inválido.' });
+    }
+    res.json(runBudIntake(message, history));
   });
 
   // 6. Get Project by ID
@@ -99,6 +175,31 @@ async function startServer() {
       return res.status(404).json({ error: 'Projeto não encontrado.' });
     }
     res.json({ files: project.files });
+  });
+
+  app.post('/api/projects/:id/assets', (req, res) => {
+    const project = jobEngine.getProject(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Projeto não encontrado.' });
+    const assets = normalizeAssets(req.body?.assets || []);
+    if (!assets.length) return res.status(400).json({ error: 'Nenhum asset válido enviado.' });
+    project.assets ||= [];
+    project.assets.push(...assets);
+    project.updatedAt = new Date().toISOString();
+    res.status(201).json({ assets: project.assets });
+  });
+
+  app.get('/api/projects/:id/assets', (req, res) => {
+    const project = jobEngine.getProject(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Projeto não encontrado.' });
+    res.json({ assets: project.assets || [] });
+  });
+
+  app.delete('/api/projects/:id/assets/:assetId', (req, res) => {
+    const project = jobEngine.getProject(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Projeto não encontrado.' });
+    project.assets = (project.assets || []).filter(asset => asset.id !== req.params.assetId);
+    project.updatedAt = new Date().toISOString();
+    res.json({ assets: project.assets });
   });
 
   // 8. Direct Preview HTML stream for isolated iframe
@@ -146,10 +247,14 @@ async function startServer() {
     if (!project) {
       return res.status(404).json({ error: 'Projeto não encontrado.' });
     }
-    res.json({
-      success: true,
+    const requiredFiles = ['package.json', 'index.html', 'src/main.tsx', 'src/App.tsx'];
+    const missing = requiredFiles.filter(file => !project.files[file]?.content);
+    const success = missing.length === 0;
+    res.status(success ? 200 : 422).json({
+      success,
       readiness: project.readiness,
-      message: 'Build compilado com sucesso: 0 erros.'
+      missing,
+      message: success ? 'Build estrutural validado: entrypoint e arquivos essenciais presentes.' : `Build bloqueado. Arquivos ausentes: ${missing.join(', ')}`
     });
   });
 
@@ -159,9 +264,9 @@ async function startServer() {
     if (!project) {
       return res.status(404).json({ error: 'Projeto não encontrado.' });
     }
-    res.json({
-      readiness: project.readiness
-    });
+    const result = runComprehensiveQA(project.intent, project.files, jobEngine.getPreviewHtml(project.id));
+    project.readiness = result.readiness;
+    res.json({ readiness: result.readiness, reports: result.reports });
   });
 
   // 11. Run Tests endpoint
@@ -170,12 +275,11 @@ async function startServer() {
     if (!project) {
       return res.status(404).json({ error: 'Projeto não encontrado.' });
     }
-    res.json({
-      success: true,
-      testsPassed: 8,
-      testsFailed: 0,
-      readiness: project.readiness
-    });
+    const result = runComprehensiveQA(project.intent, project.files, jobEngine.getPreviewHtml(project.id));
+    const functional = result.reports.find((report: any) => report.metric === 'Functional QA');
+    const testsPassed = functional?.status === 'PASS' ? 1 : 0;
+    const testsFailed = functional?.status === 'PASS' ? 0 : 1;
+    res.status(testsFailed ? 422 : 200).json({ success: !testsFailed, testsPassed, testsFailed, readiness: result.readiness, details: functional?.details });
   });
 
   // 12. Run Command endpoint in Project Sandbox
@@ -214,10 +318,12 @@ async function startServer() {
       return res.status(404).json({ error: 'Projeto não encontrado.' });
     }
     const deployment = await deploymentProvider.triggerDeployment(project.id, target);
-    res.json({
-      success: true,
+    res.status(deployment.state === 'DEPLOYED' ? 200 : 422).json({
+      success: deployment.state === 'DEPLOYED',
       deployment,
-      message: `Deploy concluído com sucesso no cluster ${target}.`
+      message: deployment.state === 'DEPLOYED'
+        ? `Deploy concluído com sucesso em ${target}.`
+        : `Deploy não executado: configure a credencial necessária para ${target}.`
     });
   });
 
@@ -252,6 +358,31 @@ async function startServer() {
     res.setHeader('Content-Disposition', `attachment; filename="${project.name.toLowerCase().replace(/\s+/g, '-')}-bundle.json"`);
     res.setHeader('Content-Type', 'application/json');
     res.json(exportBundle);
+  });
+
+  // 16a. Kit final de publicação e compartilhamento
+  app.get('/api/projects/:id/publish-kit', (req, res) => {
+    const project = jobEngine.getProject(req.params.id);
+    if (!project) {
+      return res.status(404).json({ error: 'Projeto não encontrado.' });
+    }
+    const slug = project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || project.id;
+    res.json({
+      projectId: project.id,
+      projectName: project.name,
+      ready: project.readiness.ready,
+      files: Object.keys(project.files),
+      instructions: {
+        github: 'Exporte o bundle, crie um repositório e faça commit na branch main.',
+        vercel: 'Importe o repositório na Vercel. O vercel.json já define build e saída dist.',
+        netlify: 'Importe o repositório no Netlify. O netlify.toml já define build, saída e fallback SPA.'
+      },
+      links: {
+        githubNewRepository: `https://github.com/new?name=${encodeURIComponent(slug)}`,
+        vercelImport: `https://vercel.com/new/clone?repository-name=${encodeURIComponent(slug)}`,
+        netlifyDrop: 'https://app.netlify.com/drop'
+      }
+    });
   });
 
   // 17. GitHub integration status & sync

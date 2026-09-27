@@ -181,6 +181,15 @@ export class InteractiveAuditEngine {
         handler: 'handleSendChat',
         api: 'POST /api/bud/run',
         status: 'CONNECTED'
+      },
+      {
+        id: 'btn-bud-saas-discovery',
+        label: 'Descoberta guiada para SaaS',
+        component: 'LandingPage',
+        event: 'click/submit',
+        handler: 'startJob -> runBudIntake',
+        api: 'POST /api/bud/intake',
+        status: 'CONNECTED'
       }
     ];
   }

@@ -46,6 +46,16 @@ export class GitHubProvider {
       message: `Repositório ${projectName} sincronizado com sucesso na branch main.`
     };
   }
+
+  public getShareLinks(projectName: string) {
+    const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'bud-project';
+    return {
+      repositoryName: slug,
+      createRepository: `https://github.com/new?name=${encodeURIComponent(slug)}`,
+      vercelImport: `https://vercel.com/new/clone?repository-name=${encodeURIComponent(slug)}`,
+      netlifyDrop: 'https://app.netlify.com/drop'
+    };
+  }
 }
 
 export const githubProvider = new GitHubProvider();

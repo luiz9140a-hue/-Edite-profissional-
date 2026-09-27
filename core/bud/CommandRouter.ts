@@ -10,6 +10,16 @@ export class CommandRouter {
   public route(input: string): RoutedCommand {
     const text = input.trim().toLowerCase();
 
+    if (text.includes('supremobuild') || text.includes('supremo build') || text.includes('full stack completo') || text.includes('modo engenheiro')) {
+      return {
+        intent: 'SUPREME_BUILD',
+        action: 'orchestrateFullStack',
+        parameters: { mode: 'SUPREME_BUILD', runAllEnabledExecutors: true },
+        requiresConfirmation: false,
+        description: 'Ativando o orquestrador SupremoBuild: produto, UX, frontend, backend, dados, integrações, mídia, testes, responsividade, performance, deploy e documentação.'
+      };
+    }
+
     // 1. Build / Compilation
     if (text.includes('build') || text.includes('compilar') || text.includes('compile')) {
       return {

@@ -13,7 +13,7 @@ export type JobStatus =
   | 'CANCELLED';
 
 export interface IntentContract {
-  projectType: 'website' | 'saas' | 'ecommerce' | 'landing_page' | 'dashboard' | 'delivery';
+  projectType: 'website' | 'blog' | 'saas' | 'ecommerce' | 'landing_page' | 'dashboard' | 'delivery';
   businessType: string;
   businessName: string;
   domain: string;
@@ -40,6 +40,19 @@ export interface ProjectFile {
   content: string;
   language: string;
   updatedAt: string;
+}
+
+export type ProjectAssetKind = 'image' | 'video' | 'audio';
+
+export interface ProjectAsset {
+  id: string;
+  name: string;
+  kind: ProjectAssetKind;
+  mimeType: string;
+  size: number;
+  dataUrl: string;
+  source: 'upload' | 'generated' | 'library';
+  createdAt: string;
 }
 
 export interface QAResult {
@@ -122,6 +135,7 @@ export interface Project {
   status: JobStatus;
   intent: IntentContract;
   files: Record<string, ProjectFile>;
+  assets: ProjectAsset[];
   readiness: ProjectReadiness;
   brain: ProjectBrain;
   activeJobId?: string;

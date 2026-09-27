@@ -13,6 +13,8 @@ export function analyzeIntent(prompt: string, currentContract?: IntentContract):
   const isGym = p.includes('academia') || p.includes('fitness') || p.includes('treino') || p.includes('gym');
   // Detection for SaaS / Software
   const isSaaS = p.includes('saas') || p.includes('crm') || p.includes('dashboard') || p.includes('sistema');
+  const isBlog = /\b(blog|artigos|not[ií]cias|conte[uú]do|revista)\b/i.test(p);
+  const isLanding = /landing\s*page|p[aá]gina de vendas|p[aá]gina de captura|one\s*page|p[aá]gina comercial/i.test(p);
 
   let domain = 'general';
   let projectType: IntentContract['projectType'] = 'website';
@@ -22,6 +24,7 @@ export function analyzeIntent(prompt: string, currentContract?: IntentContract):
   let visualConcepts = ['moderno', 'responsivo', 'elegante', 'alta conversão'];
   let requiredAssets = ['hero_banner', 'services_icons', 'about_photo'];
   let forbiddenAssets = ['low_quality', 'broken_links'];
+  let primaryGoal = 'Converter visitantes em clientes e otimizar operações';
   let colorPalette = {
     primary: '#2563EB',
     secondary: '#1E293B',
@@ -36,7 +39,23 @@ export function analyzeIntent(prompt: string, currentContract?: IntentContract):
     businessName = nameMatch[1].trim();
   }
 
-  if (isBurger) {
+  if (isBlog) {
+    domain = 'blog';
+    projectType = 'blog';
+    businessType = 'publicacao_conteudo';
+    businessName = 'Meu Blog';
+    requiredFeatures = ['Feed de artigos', 'Busca e filtros por categoria', 'Página de leitura', 'Newsletter', 'Compartilhamento social'];
+    visualConcepts = ['editorial', 'legível', 'conteúdo', 'moderno', 'responsivo'];
+    requiredAssets = ['editorial_cover', 'author_portrait', 'article_illustration'];
+  } else if (isLanding) {
+    domain = 'landing_page';
+    projectType = 'landing_page';
+    businessType = 'pagina_comercial';
+    businessName = 'Minha Oferta';
+    requiredFeatures = ['Hero com proposta de valor', 'Benefícios e prova social', 'CTA de conversão', 'Formulário de captura', 'FAQ'];
+    visualConcepts = ['alta conversão', 'clareza', 'impacto', 'mobile-first', 'velocidade'];
+    requiredAssets = ['hero_banner', 'product_mockup', 'social_proof'];
+  } else if (isBurger) {
     domain = 'food_delivery';
     projectType = 'delivery';
     businessType = 'hamburgueria_artesanal';
@@ -145,13 +164,20 @@ export function analyzeIntent(prompt: string, currentContract?: IntentContract):
     };
   }
 
+  // Um pedido explícito de SaaS mantém o nicho visual, mas muda o produto para plataforma.
+  // Isso evita que “SaaS para academias” seja reduzido a uma landing page fitness.
+  if (isSaaS && domain !== 'general') {
+    projectType = 'saas';
+    primaryGoal = 'Gerenciar operações do nicho em um painel interativo e converter usuários em clientes';
+  }
+
   return {
     projectType,
     businessType,
     businessName,
     domain,
     targetAudience: 'Clientes exigentes e usuários digitais',
-    primaryGoal: 'Converter visitantes em clientes e otimizar operações',
+    primaryGoal,
     requiredFeatures,
     visualConcepts,
     requiredAssets,

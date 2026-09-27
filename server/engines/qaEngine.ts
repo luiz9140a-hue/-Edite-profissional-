@@ -106,6 +106,39 @@ export function runComprehensiveQA(
     const hasSchedule = previewHtml.includes('Agenda') || previewHtml.includes('Paciente');
     functionalPass = hasSchedule;
     functionalDetails = hasSchedule ? 'Módulos de gestão de pacientes e agendamentos confirmados.' : 'Faltam módulos clínicos requeridos.';
+  } else if (intent.domain === 'fitness') {
+    if (intent.projectType === 'saas') {
+      const hasNavigation = previewHtml.includes('switchView');
+      const hasCreateFlow = previewHtml.includes('openModal') && previewHtml.includes('saveRecord');
+      const hasRecords = previewHtml.includes('student-list');
+      functionalPass = hasNavigation && hasCreateFlow && hasRecords;
+      functionalDetails = functionalPass
+        ? 'Dashboard SaaS, navegação por módulos e cadastro interativo validados.'
+        : 'Faltam interações essenciais no dashboard SaaS.';
+    } else {
+      const hasTimer = previewHtml.includes('startTimer') && previewHtml.includes('resetTimer');
+      const hasHistory = previewHtml.includes('logSet') && previewHtml.includes('workout-history');
+      const hasPlan = previewHtml.includes('exercise-plan') && previewHtml.includes('filterExercises');
+      functionalPass = hasTimer && hasHistory && hasPlan;
+      functionalDetails = functionalPass
+        ? 'Cronômetro, histórico de séries e ficha de exercícios confirmados.'
+        : 'Faltam uma ou mais funções requeridas para o aplicativo de treino.';
+    }
+  } else if (intent.domain === 'blog') {
+    const hasFeed = previewHtml.includes('post-feed') && previewHtml.includes('filterPosts');
+    const hasNewsletter = previewHtml.includes('subscribe') && previewHtml.includes('newsletter-email');
+    functionalPass = hasFeed && hasNewsletter;
+    functionalDetails = functionalPass ? 'Feed, busca de artigos e newsletter confirmados.' : 'Faltam interações essenciais do blog.';
+  } else if (intent.domain === 'landing_page') {
+    const hasCapture = previewHtml.includes('captureLead') && previewHtml.includes('capture-feedback');
+    const hasCta = previewHtml.includes('scrollIntoView');
+    functionalPass = hasCapture && hasCta;
+    functionalDetails = functionalPass ? 'CTA e captura de lead confirmados.' : 'Faltam conversão ou captura de lead na landing page.';
+  } else {
+    const hasCta = previewHtml.includes('scrollIntoView') || previewHtml.includes('onclick=');
+    const hasContact = previewHtml.includes('submitContact') && previewHtml.includes('contact-feedback');
+    functionalPass = hasCta && hasContact;
+    functionalDetails = functionalPass ? 'CTA, navegação e formulário de contato confirmados.' : 'Projeto genérico sem fluxo clicável mínimo de CTA e contato.';
   }
 
   reports.push({
@@ -136,7 +169,7 @@ export function runComprehensiveQA(
     visual: 'PASS',
     brokenImages: brokenImagesPass ? 'PASS' : 'FAIL',
     ready: allPass,
-    score: allPass ? 100 : 75,
+    score: Math.round(([buildPass, semanticPass, brokenImagesPass, responsivePass, functionalPass, securityPass].filter(Boolean).length / 6) * 100),
     responsiveBreakpoints
   };
 

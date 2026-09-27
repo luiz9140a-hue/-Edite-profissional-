@@ -35,6 +35,7 @@ import { ErrorBoundary } from '../common/ErrorBoundary';
 import PreviewStage from '../preview/PreviewStage';
 import MobileWorkspaceNavigation, { MobileTab } from './MobileWorkspaceNavigation';
 import ProjectFilesList from './ProjectFilesList';
+import ProjectAssetLibrary from './ProjectAssetLibrary';
 
 export default function Workspace() {
   return (
@@ -78,6 +79,7 @@ function WorkspaceContent() {
   const [copiedFile, setCopiedFile] = useState(false);
   const [actionLock, setActionLock] = useState<string | null>(null);
   const [actionFeedback, setActionFeedback] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+  const [publishKit, setPublishKit] = useState<{ links: { githubNewRepository: string; vercelImport: string; netlifyDrop: string }; ready: boolean } | null>(null);
 
   const terminalEndRef = useRef<HTMLDivElement>(null);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
@@ -268,23 +270,40 @@ function WorkspaceContent() {
     }
   };
 
-  const handleManualDeploy = async () => {
+  const handleManualDeploy = async (target: 'cloud_run' | 'vercel' | 'netlify' = 'cloud_run') => {
     if (!project || actionLock) return;
     setActionLock('DEPLOYING');
-    setActionFeedback({ message: 'Provisionando container no Cloud Run...', type: 'info' });
+    setActionFeedback({ message: `Validando publicação na ${target}...`, type: 'info' });
     try {
       const res = await fetch(`/api/projects/${project.id}/deploy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target: 'cloud_run' })
+        body: JSON.stringify({ target })
       });
       const data = await res.json();
-      setActionFeedback({ message: `Deploy concluído! Disponível em: https://${project.id}.engrenagem.app`, type: 'success' });
+      if (!res.ok || !data.success || data.deployment?.state === 'FAILED') {
+        setActionFeedback({ message: data.message || data.deployment?.logs?.at(-1) || `Configure a credencial da ${target} para publicar.`, type: 'error' });
+      } else {
+        setActionFeedback({ message: `Publicação concluída: ${data.deployment.url}`, type: 'success' });
+      }
     } catch (e: any) {
       setActionFeedback({ message: 'Falha no deploy: ' + e.message, type: 'error' });
     } finally {
       setActionLock(null);
       setTimeout(() => setActionFeedback(null), 5000);
+    }
+  };
+
+  const handleOpenPublishKit = async () => {
+    if (!project) return;
+    setActionFeedback({ message: 'Preparando kit final para GitHub, Vercel e Netlify...', type: 'info' });
+    try {
+      const res = await fetch(`/api/projects/${project.id}/publish-kit`);
+      if (!res.ok) throw new Error('Não foi possível preparar o kit');
+      setPublishKit(await res.json());
+      setActionFeedback({ message: 'Kit pronto. Escolha onde publicar ou compartilhar.', type: 'success' });
+    } catch (e: any) {
+      setActionFeedback({ message: 'Falha ao preparar publicação: ' + e.message, type: 'error' });
     }
   };
 
@@ -459,7 +478,7 @@ function WorkspaceContent() {
             <span>🔧 Corrigir</span>
           </button>
           <button
-            onClick={handleManualDeploy}
+            onClick={() => handleManualDeploy('cloud_run')}
             disabled={!!actionLock}
             className={`px-2.5 py-1 rounded-lg transition flex items-center gap-1 ${
               actionLock === 'DEPLOYING' ? 'bg-emerald-600 text-white animate-pulse' : 'text-emerald-400 hover:text-emerald-300 hover:bg-slate-800'
@@ -660,6 +679,7 @@ function WorkspaceContent() {
                 }}
                 isMobile={true}
               />
+              <ProjectAssetLibrary projectId={project?.id} initialAssets={project?.assets || []} />
             </div>
           )}
 
@@ -900,11 +920,14 @@ function WorkspaceContent() {
             {/* Left Tab Content */}
             <div className="flex-1 overflow-y-auto">
               {activeLeftTab === 'files' && (
-                <ProjectFilesList
-                  files={project?.files || {}}
-                  selectedFile={selectedFile}
-                  onSelectFile={setSelectedFile}
-                />
+                <>
+                  <ProjectFilesList
+                    files={project?.files || {}}
+                    selectedFile={selectedFile}
+                    onSelectFile={setSelectedFile}
+                  />
+                  <ProjectAssetLibrary projectId={project?.id} initialAssets={project?.assets || []} />
+                </>
               )}
 
               {activeLeftTab === 'brain' && (
@@ -941,42 +964,57 @@ function WorkspaceContent() {
                       <span className="font-bold text-white flex items-center gap-1.5">
                         <GitBranch className="w-3.5 h-3.5 text-blue-400" /> GitHub
                       </span>
-                      <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-mono">
-                        NOT_CONFIGURED
+                      <span className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded font-mono">
+                        KIT PRONTO
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-400 mb-3">
-                      Conecte sua conta do GitHub para realizar commits e push direto para seu repositório.
+                      Exporte o projeto completo e abra a criação do repositório. O kit inclui README e configurações de deploy.
                     </p>
                     <button
-                      onClick={handleSyncGitHub}
+                      onClick={handleOpenPublishKit}
                       className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition"
                     >
                       <GitBranch className="w-3.5 h-3.5 text-blue-400" />
-                      <span>Sincronizar Repositório</span>
+                      <span>Preparar compartilhamento</span>
                     </button>
                   </div>
 
                   <div className="bg-slate-900 p-3 rounded-xl border border-slate-800">
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="font-bold text-white flex items-center gap-1.5">
-                        <CloudUpload className="w-3.5 h-3.5 text-emerald-400" /> Cloud Run Deploy
+                        <CloudUpload className="w-3.5 h-3.5 text-emerald-400" /> Publicação Web
                       </span>
                       <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono">
-                        DEV_ACTIVE
+                        VERCEL / NETLIFY
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-400 mb-3">
-                      Instância ativa no Google Cloud Run via porta 3000.
+                      Publicação direta quando o token do provedor estiver configurado; caso contrário, use os links do kit.
                     </p>
                     <button
-                      onClick={handleManualDeploy}
+                      onClick={() => handleManualDeploy('vercel')}
                       disabled={actionLock === 'DEPLOYING'}
                       className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/30 transition"
                     >
                       <CloudUpload className="w-3.5 h-3.5" />
-                      <span>{actionLock === 'DEPLOYING' ? 'Publicando...' : 'Executar Deploy de Produção'}</span>
+                      <span>{actionLock === 'DEPLOYING' ? 'Publicando...' : 'Publicar na Vercel'}</span>
                     </button>
+                    <button
+                      onClick={() => handleManualDeploy('netlify')}
+                      disabled={actionLock === 'DEPLOYING'}
+                      className="w-full mt-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white py-2 rounded-xl text-xs font-bold transition"
+                    >
+                      Publicar no Netlify
+                    </button>
+                    {publishKit && (
+                      <div className="mt-3 border-t border-slate-800 pt-3 space-y-1.5">
+                        <div className="text-[10px] text-slate-500 uppercase font-bold">Compartilhar / importar</div>
+                        <a href={publishKit.links.githubNewRepository} target="_blank" rel="noreferrer" className="block text-blue-400 hover:text-blue-300 underline">Abrir novo repositório GitHub</a>
+                        <a href={publishKit.links.vercelImport} target="_blank" rel="noreferrer" className="block text-blue-400 hover:text-blue-300 underline">Importar na Vercel</a>
+                        <a href={publishKit.links.netlifyDrop} target="_blank" rel="noreferrer" className="block text-blue-400 hover:text-blue-300 underline">Abrir Netlify Drop</a>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -136,6 +136,33 @@ const VERIFIED_ASSET_LIBRARY: VerifiedAsset[] = [
     alt: 'Dashboard analítico com métricas em tempo real e visualização de dados',
     width: 1200,
     height: 800
+  },
+  {
+    id: 'blog-editorial-1',
+    category: 'blog',
+    semanticTags: ['blog', 'editorial', 'tecnologia', 'conteudo', 'artigo', 'workspace'],
+    url: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=1200&q=85',
+    alt: 'Mesa editorial com notebook, caderno e café em ambiente de trabalho real',
+    width: 1200,
+    height: 800
+  },
+  {
+    id: 'landing-product-1',
+    category: 'landing_page',
+    semanticTags: ['landing', 'produto', 'design', 'marketing', 'mockup', 'real'],
+    url: 'https://images.unsplash.com/photo-1558655146-d09347e92766?auto=format&fit=crop&w=1200&q=85',
+    alt: 'Composição real de design de produto e materiais de marca sobre mesa',
+    width: 1200,
+    height: 800
+  },
+  {
+    id: 'creative-team-1',
+    category: 'general',
+    semanticTags: ['equipe', 'criativo', 'tecnologia', 'startup', 'design', 'pessoas'],
+    url: 'https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=1200&q=85',
+    alt: 'Equipe real colaborando em projeto de tecnologia em escritório moderno',
+    width: 1200,
+    height: 800
   }
 ];
 
@@ -147,6 +174,11 @@ export function validateAndGetSemanticAssets(intent: IntentContract): {
 
   // Filter out any assets containing forbidden tags
   const validAssets = VERIFIED_ASSET_LIBRARY.filter(asset => {
+    const isPlaceholder = /placeholder|picsum|placehold|dummy|fake|lorem/i.test(asset.url) || /placeholder|illustration|drawing|clipart|cartoon|vector/i.test(asset.alt);
+    if (isPlaceholder) {
+      rejectedReasons.push(`Asset '${asset.id}' rejeitado pelo SemanticGuard: imagem não fotográfica ou placeholder.`);
+      return false;
+    }
     // Check forbidden
     const isForbidden = intent.forbiddenAssets.some(forbidden =>
       asset.semanticTags.some(tag => tag.toLowerCase().includes(forbidden.toLowerCase())) ||
@@ -163,7 +195,7 @@ export function validateAndGetSemanticAssets(intent: IntentContract): {
   });
 
   return {
-    assets: validAssets.length > 0 ? validAssets : VERIFIED_ASSET_LIBRARY.filter(a => a.category === 'b2b_saas'),
+    assets: validAssets.length > 0 ? validAssets : VERIFIED_ASSET_LIBRARY.filter(a => a.id === 'creative-team-1' || a.id === 'saas-hero-1'),
     rejectedReasons
   };
 }
