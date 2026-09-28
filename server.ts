@@ -18,6 +18,7 @@ import { ProjectAsset, ProjectAssetKind } from './src/types/engrenagem';
 import { getDocument, publishDocument, saveDocument } from './core/visual-builder/documentStore';
 import { applyOperation, type VisualOperation } from './core/visual-builder/operations';
 import { listRegisteredComponents } from './core/visual-builder/componentRegistry';
+import { checkPlatformHealth, getLastSync, syncDocument } from './core/platform-bridge/bridge';
 
 function normalizeAssets(input: unknown): ProjectAsset[] {
   if (!Array.isArray(input)) return [];
@@ -77,6 +78,31 @@ export async function createApp(options: { withVite?: boolean } = {}) {
     }
     const updated = applyOperation(getDocument(req.params.id), operation);
     res.json(saveDocument(updated));
+  });
+
+  app.get('/api/platform/health', async (_req, res) => {
+    res.json(await checkPlatformHealth());
+  });
+
+  app.get('/api/platform/documents/:id/manifest', (req, res) => {
+    res.json({ document: getDocument(req.params.id), lastSync: getLastSync(req.params.id) });
+  });
+
+  app.post('/api/platform/documents/:id/sync', async (req, res) => {
+    try {
+      res.json(await syncDocument(getDocument(req.params.id)));
+    } catch (error) {
+      res.status(502).json({ error: error instanceof Error ? error.message : 'Falha ao sincronizar com o Studio.' });
+    }
+  });
+
+  app.post('/api/platform/documents/:id/publish', async (req, res) => {
+    try {
+      const document = publishDocument(req.params.id);
+      res.json(await syncDocument(document));
+    } catch (error) {
+      res.status(502).json({ error: error instanceof Error ? error.message : 'Falha ao publicar na plataforma.' });
+    }
   });
 
   // 0. Catálogo público da página de vendas

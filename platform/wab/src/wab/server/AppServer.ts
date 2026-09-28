@@ -91,6 +91,7 @@ import {
   ROUTES_WITH_TIMING,
   addInternalRoutes,
 } from "@/wab/server/routes/custom-routes";
+import { importEngrenagemBundle } from "@/wab/server/routes/engrenagem-bridge";
 import {
   allowProjectToDataSource,
   createDataSource,
@@ -657,6 +658,7 @@ function addMiddlewares(
   // Parse body further down to prevent unauthorized users from incurring large parses.
   app.use(bodyParser.json({ limit: "400mb" }));
   app.use(bodyParser.urlencoded({ extended: true }));
+  app.post("/api/bridge/import", importEngrenagemBundle);
 
   app.use((req, res, next) => {
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
