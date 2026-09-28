@@ -33,6 +33,8 @@ export interface BridgeSyncResult {
   version: number;
   target: string;
   syncedAt: string;
+  requestId: string;
+  idempotencyKey: string;
   bundle: PlatformBundle;
 }
 

@@ -1,0 +1,9 @@
+platform/node_modules
+platform/wab/node_modules
+platform/canvas-packages/node_modules
+platform/loader-bundle-env/node_modules
+platform/loader-html-hydrate/node_modules
+node_modules
+.git
+*.tsbuildinfo
+platform/wab/src/wab/gen

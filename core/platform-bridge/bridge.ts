@@ -1,5 +1,6 @@
 import type { VisualDocument } from '../../src/types/visual.ts';
 import { toPlatformBundle, type BridgeHealth, type BridgeSyncResult } from './contracts.ts';
+import { serializeByKey } from './traffic.ts';
 
 const syncs = new Map<string, BridgeSyncResult>();
 
@@ -20,13 +21,22 @@ export async function checkPlatformHealth(): Promise<BridgeHealth> {
   }
 }
 
-export async function syncDocument(document: VisualDocument): Promise<BridgeSyncResult> {
+export async function syncDocument(document: VisualDocument, context: { requestId: string; idempotencyKey?: string }): Promise<BridgeSyncResult> {
+  return serializeByKey(`document:${document.id}`, async () => syncDocumentOnce(document, context));
+}
+
+async function syncDocumentOnce(document: VisualDocument, context: { requestId: string; idempotencyKey?: string }): Promise<BridgeSyncResult> {
   const bundle = toPlatformBundle(document);
+  const idempotencyKey = context.idempotencyKey || `${document.id}:v${document.version}`;
+  const existing = syncs.get(document.id);
+  if (existing?.idempotencyKey === idempotencyKey) return existing;
   const result: BridgeSyncResult = {
     documentId: document.id,
     version: document.version,
     target: targetUrl(),
     syncedAt: new Date().toISOString(),
+    requestId: context.requestId,
+    idempotencyKey,
     bundle,
   };
   const target = targetUrl();

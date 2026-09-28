@@ -19,6 +19,7 @@ import { getDocument, publishDocument, saveDocument } from './core/visual-builde
 import { applyOperation, type VisualOperation } from './core/visual-builder/operations';
 import { listRegisteredComponents } from './core/visual-builder/componentRegistry';
 import { checkPlatformHealth, getLastSync, syncDocument } from './core/platform-bridge/bridge';
+import { allowRequest, requestId } from './core/platform-bridge/traffic';
 
 function normalizeAssets(input: unknown): ProjectAsset[] {
   if (!Array.isArray(input)) return [];
@@ -38,6 +39,11 @@ function normalizeAssets(input: unknown): ProjectAsset[] {
 export async function createApp(options: { withVite?: boolean } = {}) {
   const app = express();
   app.use(express.json({ limit: '50mb' }));
+  app.use((req, res, next) => {
+    const id = requestId(req.header('x-request-id'));
+    res.setHeader('x-request-id', id);
+    next();
+  });
 
   // --- API Endpoints ---
 
@@ -89,17 +95,25 @@ export async function createApp(options: { withVite?: boolean } = {}) {
   });
 
   app.post('/api/platform/documents/:id/sync', async (req, res) => {
+    if (!allowRequest(`platform-sync:${req.ip}`)) return res.status(429).json({ error: 'Tráfego da ponte temporariamente limitado.', retryAfterSeconds: 60 });
     try {
-      res.json(await syncDocument(getDocument(req.params.id)));
+      res.json(await syncDocument(getDocument(req.params.id), {
+        requestId: String(res.getHeader('x-request-id')),
+        idempotencyKey: req.header('idempotency-key') || undefined,
+      }));
     } catch (error) {
       res.status(502).json({ error: error instanceof Error ? error.message : 'Falha ao sincronizar com o Studio.' });
     }
   });
 
   app.post('/api/platform/documents/:id/publish', async (req, res) => {
+    if (!allowRequest(`platform-publish:${req.ip}`, 20)) return res.status(429).json({ error: 'Publicações temporariamente limitadas.', retryAfterSeconds: 60 });
     try {
       const document = publishDocument(req.params.id);
-      res.json(await syncDocument(document));
+      res.json(await syncDocument(document, {
+        requestId: String(res.getHeader('x-request-id')),
+        idempotencyKey: req.header('idempotency-key') || undefined,
+      }));
     } catch (error) {
       res.status(502).json({ error: error instanceof Error ? error.message : 'Falha ao publicar na plataforma.' });
     }
