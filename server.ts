@@ -66,7 +66,7 @@ export async function createApp(options: { withVite?: boolean } = {}) {
   });
 
   // 1. Create a new Generation Job / Project
-  app.post('/api/generation/jobs', (req, res) => {
+  app.post('/api/generation/jobs', async (req, res) => {
     try {
       const { prompt, projectId, assets = [] } = req.body;
       if (!prompt || typeof prompt !== 'string') {
@@ -81,7 +81,7 @@ export async function createApp(options: { withVite?: boolean } = {}) {
       }
 
       const safeAssets = normalizeAssets(assets);
-      const { project, job } = jobEngine.createJob(prompt, projectId, safeAssets);
+      const { project, job } = await jobEngine.createJob(prompt, projectId, safeAssets);
       res.setHeader('X-Credits-Charged', String(reservation.charged));
       res.setHeader('X-Credits-Remaining', String(reservation.remaining));
       res.json({

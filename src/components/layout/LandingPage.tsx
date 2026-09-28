@@ -57,6 +57,7 @@ export default function LandingPage() {
     }
 
     const data = await res.json();
+    window.sessionStorage.setItem('bud-last-result', JSON.stringify({ job: data, project: data.project }));
     setActiveJobStatus('Analisando intenção e arquitetura...');
     setTimeout(() => navigate(`/workspace?project=${data.projectId}&job=${data.jobId}`), 700);
   };

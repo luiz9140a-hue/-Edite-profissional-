@@ -94,7 +94,7 @@ export class JobEngine {
   /**
    * Main entrypoint for starting a generation job and creating a project
    */
-  public createJob(prompt: string, existingProjectId?: string, assets: ProjectAsset[] = []): { project: Project; job: GenerationJob } {
+  public async createJob(prompt: string, existingProjectId?: string, assets: ProjectAsset[] = []): Promise<{ project: Project; job: GenerationJob }> {
     const projectId = existingProjectId || ('proj-' + Math.random().toString(36).substring(2, 9));
     const jobId = 'job-' + Math.random().toString(36).substring(2, 9);
     const now = new Date().toISOString();
@@ -172,10 +172,10 @@ export class JobEngine {
 
     eventEngine.emit(projectId, jobId, 'JOB_CREATED', { prompt, projectId });
 
-    // Execute asynchronous lifecycle
-    this.executeJobLifecycle(jobId, projectId, prompt);
+    // Aguarda o pipeline para que a resposta já contenha o projeto utilizável.
+    await this.executeJobLifecycle(jobId, projectId, prompt);
 
-    return { project, job };
+    return { project: this.projects.get(projectId) || project, job: this.jobs.get(jobId) || job };
   }
 
   /**
