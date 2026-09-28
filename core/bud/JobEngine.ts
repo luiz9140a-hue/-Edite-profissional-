@@ -22,6 +22,7 @@ import { IntentAnalyzer } from '../project-forge/IntentAnalyzer';
 import { ProjectClassifier } from '../project-forge/ProjectClassifier';
 import { ProjectBrainManager } from '../project-forge/ProjectBrainManager';
 import { generateAiVisual, shouldGenerateAiVisual } from '../../server/visual/imageGenerationProvider';
+import { supremeExecutorRuntime } from '../supreme-build/SupremeExecutorRuntime';
 
 export class JobEngine {
   private jobs: Map<string, GenerationJob> = new Map();
@@ -362,6 +363,20 @@ export class JobEngine {
       }
 
       addLog('info', `[ExecutionEngine] ${Object.keys(files).length} arquivos gerados no disco com sucesso.`, 'EXECUTING');
+
+      // 4a. SUPREME EXECUTOR RUNTIME: executa os 13 engenheiros reais em ordem topológica.
+      const executorReport = await supremeExecutorRuntime.run(
+        plan.executionGraph,
+        { project, intent, files: project.files, assetsCount: assets.length, previewHtml },
+        (level, message, agent) => addLog(level, message, 'EXECUTING', agent)
+      );
+      project.brain.decisions.push(
+        `SupremeExecutorRuntime: ${executorReport.passed} aprovados, ${executorReport.warnings} alertas, ${executorReport.failed} bloqueios.`
+      );
+      if (executorReport.failed > 0) {
+        throw new Error(`SupremeBuild bloqueado: ${executorReport.failed} executor(es) falharam.`);
+      }
+      addLog('success', `[SupremeExecutorRuntime] Grafo completo executado: ${executorReport.passed} PASS, ${executorReport.warnings} WARN.`, 'EXECUTING', 'SupremeBuildOrchestrator');
       await this.sleep(300);
 
       // 5. BUILDING
