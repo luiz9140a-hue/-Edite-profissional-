@@ -10,7 +10,9 @@ export interface RepairAttempt {
 }
 
 export class RepairEngine {
-  private readonly MAX_RETRIES = 3;
+  private get maxRetries(): number {
+    return Math.max(0, Number.parseInt(process.env.BUD_MAX_REPAIR_ATTEMPTS || '5', 10) || 5);
+  }
 
   public diagnoseAndRepair(
     errorMessage: string,
@@ -21,7 +23,7 @@ export class RepairEngine {
     repairAttempt?: RepairAttempt;
     repairedFiles?: Record<string, ProjectFile>;
   } {
-    if (currentAttempts >= this.MAX_RETRIES) {
+    if (currentAttempts >= this.maxRetries) {
       return { canRepair: false };
     }
 

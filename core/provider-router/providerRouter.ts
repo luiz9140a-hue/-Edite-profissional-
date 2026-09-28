@@ -20,11 +20,14 @@ export class ProviderRouter {
     // 1. Google Gemini AI Provider
     const hasGeminiKey = !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY';
     this.providers.set('gemini', {
-      name: 'Google Gemini 2.5/Flash',
+      name: process.env.GEMINI_MODEL || 'Google Gemini',
       category: 'AI',
-      status: hasGeminiKey ? 'AVAILABLE' : 'AVAILABLE', // Supported via platform credentials
+      status: hasGeminiKey ? 'AVAILABLE' : 'NOT_CONFIGURED',
       description: 'Modelo de inteligência artificial de alta performance para raciocínio e geração de código.',
-      details: 'Conectado via @google/genai SDK no ambiente Google Cloud.'
+      details: hasGeminiKey
+        ? 'Conectado via @google/genai SDK no ambiente Google Cloud.'
+        : 'GEMINI_API_KEY ausente; o BUD usará o planner determinístico.',
+      requiredConfiguration: ['GEMINI_API_KEY']
     });
 
     // 2. Antigravity Agent Runtime Provider
@@ -91,6 +94,12 @@ export class ProviderRouter {
 
   public getStatus(id: string): ProviderStatus {
     return this.providers.get(id)?.status || 'NOT_CONFIGURED';
+  }
+
+  public setStatus(id: string, status: ProviderStatus, details?: string): void {
+    const provider = this.providers.get(id);
+    if (!provider) return;
+    this.providers.set(id, { ...provider, status, details: details || provider.details });
   }
 }
 

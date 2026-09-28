@@ -14,6 +14,8 @@ import { PLAN_CATALOG } from './server/billing/planCatalog.ts';
 import { reserveApiCredits, getApiUsage } from './server/billing/apiCreditLedger.ts';
 import { searchPublicLeads } from './server/leads/leadSearchProvider.ts';
 import { ProjectAsset, ProjectAssetKind } from './src/types/engrenagem.ts';
+import { getBudRuntimeHealth } from './server/engines/budRuntime.ts';
+import { isFirestoreConfigured } from './server/persistence/firestoreStore.ts';
 
 function normalizeAssets(input: unknown): ProjectAsset[] {
   if (!Array.isArray(input)) return [];
@@ -161,6 +163,20 @@ export async function createApp() {
       return res.status(400).json({ error: 'Histórico de conversa inválido.' });
     }
     res.json(runBudIntake(message, history));
+  });
+
+  // 5b. Supervisor health — nunca retorna segredos ou tokens.
+  app.get('/api/bud/health', (_req, res) => {
+    const runtime = getBudRuntimeHealth();
+    res.json({
+      ...runtime,
+      firestore: isFirestoreConfigured(),
+      repair: true,
+      qa: true,
+      projectBrain: true,
+      toolRegistry: toolRegistry.listTools().length > 0,
+      provider: providerRouter.getProvider('gemini')?.status || 'NOT_CONFIGURED'
+    });
   });
 
   // 6. Get Project by ID
