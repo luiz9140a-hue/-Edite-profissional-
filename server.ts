@@ -15,6 +15,7 @@ import { PLAN_CATALOG } from './server/billing/planCatalog';
 import { reserveApiCredits, getApiUsage } from './server/billing/apiCreditLedger';
 import { searchPublicLeads } from './server/leads/leadSearchProvider';
 import { ProjectAsset, ProjectAssetKind } from './src/types/engrenagem';
+import { getDocument, publishDocument, saveDocument } from './core/visual-builder/documentStore';
 
 function normalizeAssets(input: unknown): ProjectAsset[] {
   if (!Array.isArray(input)) return [];
@@ -44,6 +45,23 @@ export async function createApp(options: { withVite?: boolean } = {}) {
       runtime: process.env.VERCEL ? 'vercel' : 'local',
       timestamp: new Date().toISOString()
     });
+  });
+
+  // Visual builder: documento declarativo, preview e publicação.
+  app.get('/api/visual/documents/:id', (req, res) => {
+    res.json(getDocument(req.params.id));
+  });
+
+  app.put('/api/visual/documents/:id', (req, res) => {
+    const document = req.body;
+    if (!document || document.id !== req.params.id || !document.root) {
+      return res.status(400).json({ error: 'Documento visual inválido.' });
+    }
+    res.json(saveDocument(document));
+  });
+
+  app.post('/api/visual/documents/:id/publish', (req, res) => {
+    res.json(publishDocument(req.params.id));
   });
 
   // 0. Catálogo público da página de vendas

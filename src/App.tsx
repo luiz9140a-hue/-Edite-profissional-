@@ -11,6 +11,7 @@ import { ErrorBoundary } from './components/common/ErrorBoundary';
 import LoginPage from './auth/LoginPage';
 import RequireAuth from './auth/RequireAuth';
 import BeginnerLeadCoach from './components/beginner/BeginnerLeadCoach';
+import BuilderPage from './components/builder/BuilderPage';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/workspace" element={<RequireAuth><Workspace /></RequireAuth>} />
         <Route path="/beginner" element={<RequireAuth><BeginnerLeadCoach /></RequireAuth>} />
+        <Route path="/builder" element={<RequireAuth><BuilderPage /></RequireAuth>} />
         <Route path="/preview/:id" element={<RequireAuth><IsolatedPreviewPage /></RequireAuth>} />
       </Routes>
     </ErrorBoundary>

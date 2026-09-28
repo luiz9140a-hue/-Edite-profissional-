@@ -339,6 +339,10 @@ function WorkspaceContent() {
     }
   };
 
+  const handleOpenBuilder = () => {
+    navigate(`/builder?document=${encodeURIComponent(project?.id || 'starter-document')}`);
+  };
+
   const copyCode = () => {
     if (project?.files && project.files[selectedFile]) {
       navigator.clipboard.writeText(project.files[selectedFile].content);
@@ -513,6 +517,14 @@ function WorkspaceContent() {
 
         {/* Top Header Actions */}
         <div className="flex items-center space-x-1.5 sm:space-x-2 flex-shrink-0">
+          <button
+            onClick={handleOpenBuilder}
+            className="min-h-[40px] px-2.5 py-1.5 bg-violet-600/20 hover:bg-violet-600/40 text-violet-200 border border-violet-500/40 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
+            title="Abrir o editor visual"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Builder</span>
+          </button>
           {project && (
             <button
               onClick={handleOpenNewTab}
