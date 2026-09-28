@@ -36,7 +36,6 @@ import PreviewStage from '../preview/PreviewStage';
 import MobileWorkspaceNavigation, { MobileTab } from './MobileWorkspaceNavigation';
 import ProjectFilesList from './ProjectFilesList';
 import ProjectAssetLibrary from './ProjectAssetLibrary';
-import { useAuth } from '../../auth/AuthContext';
 
 export default function Workspace() {
   return (
@@ -49,17 +48,13 @@ export default function Workspace() {
 function WorkspaceContent() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user, isAdmin } = useAuth();
-  const accountHeaders = {
-    'x-account-id': user?.uid || 'anonymous',
-    'x-plan-id': isAdmin ? 'admin_lifetime' : 'free'
-  };
   const projectIdParam = searchParams.get('project');
   const jobIdParam = searchParams.get('job');
 
   const [project, setProject] = useState<Project | null>(null);
   const [job, setJob] = useState<GenerationJob | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Responsive state detection
   const [windowWidth, setWindowWidth] = useState<number>(
@@ -112,13 +107,17 @@ function WorkspaceContent() {
       try {
         if (jobIdParam) {
           const res = await fetch(`/api/generation/jobs/${jobIdParam}`);
-          if (res.ok && isMounted) {
+          if (!res.ok) throw new Error(`API de geração indisponível (HTTP ${res.status})`);
+          if (isMounted) {
             const data: GenerationJob = await res.json();
+            setLoadError(null);
             setJob(data);
 
             const projRes = await fetch(`/api/projects/${data.projectId}`);
-            if (projRes.ok && isMounted) {
+            if (!projRes.ok) throw new Error(`Projeto não disponível (HTTP ${projRes.status})`);
+            if (isMounted) {
               const projData: Project = await projRes.json();
+              setLoadError(null);
               setProject(projData);
 
               // Select first file if current selected does not exist
@@ -136,15 +135,21 @@ function WorkspaceContent() {
           }
         } else if (projectIdParam) {
           const projRes = await fetch(`/api/projects/${projectIdParam}`);
-          if (projRes.ok && isMounted) {
+          if (!projRes.ok) throw new Error(`Projeto não disponível (HTTP ${projRes.status})`);
+          if (isMounted) {
             const projData: Project = await projRes.json();
+            setLoadError(null);
             setProject(projData);
           }
         } else {
           createDefaultProject();
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Erro ao consultar status:', err);
+        if (isMounted) {
+          setLoadError(err?.message || 'Não foi possível conectar ao backend do SupremoBuild.');
+          setIsProcessing(false);
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -168,13 +173,14 @@ function WorkspaceContent() {
     try {
       const res = await fetch('/api/generation/jobs', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...accountHeaders },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: 'Crie um site premium para uma hamburgueria chamada Burger House, com cardápio, carrinho e botão de WhatsApp.'
         })
       });
-      if (!res.ok) return;
+      if (!res.ok) throw new Error(`API de geração indisponível (HTTP ${res.status})`);
       const data = await res.json();
+      setLoadError(null);
       navigate(`/workspace?project=${data.projectId}&job=${data.jobId}`, { replace: true });
     } catch (e) {
       console.error(e);
@@ -190,7 +196,7 @@ function WorkspaceContent() {
     try {
       const res = await fetch('/api/bud/run', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...accountHeaders },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId: project.id,
           message: msg
@@ -395,6 +401,16 @@ function WorkspaceContent() {
   const qaReportsList = job?.qaReport || [];
   const projectHistory = project?.brain?.history || [];
 
+  const projectLoadingFallback = loadError ? (
+    <div className="flex-1 flex flex-col gap-3 items-center justify-center p-6 text-center text-red-300 font-mono text-xs">
+      <span>{loadError}</span>
+      <span className="text-slate-500 max-w-md">O frontend está publicado, mas a API do BUD ainda não respondeu. Tente novamente após o próximo deploy.</span>
+      <button onClick={() => window.location.reload()} className="rounded-lg bg-blue-600 px-4 py-2 text-white font-bold">Tentar novamente</button>
+    </div>
+  ) : (
+    <div className="flex-1 flex items-center justify-center text-slate-500 font-mono text-xs">Carregando Projeto e montando Sandbox...</div>
+  );
+
   return (
     <div className="flex flex-col h-screen bg-[#07090E] text-slate-200 overflow-hidden font-sans select-none">
       {/* ===================== RESPONSIVE HEADER ===================== */}
@@ -558,7 +574,7 @@ function WorkspaceContent() {
                   isMobileHost={true}
                 />
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-500 font-mono text-xs">
+                loadError ? projectLoadingFallback : <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-500 font-mono text-xs">
                   <Loader2 className="w-5 h-5 animate-spin text-blue-500 mb-2" />
                   <span>Carregando Preview...</span>
                 </div>
@@ -802,7 +818,7 @@ function WorkspaceContent() {
                 onOpenLogs={() => setActiveBottomTab('terminal')}
               />
             ) : (
-              <div className="flex-1 flex items-center justify-center text-slate-500 font-mono text-xs">
+              loadError ? projectLoadingFallback : <div className="flex-1 flex items-center justify-center text-slate-500 font-mono text-xs">
                 Carregando Projeto...
               </div>
             )}
@@ -1043,7 +1059,7 @@ function WorkspaceContent() {
                 onOpenLogs={() => setActiveBottomTab('terminal')}
               />
             ) : (
-              <div className="flex-1 flex items-center justify-center text-slate-500 font-mono text-xs">
+              loadError ? projectLoadingFallback : <div className="flex-1 flex items-center justify-center text-slate-500 font-mono text-xs">
                 Carregando Projeto e montando Sandbox...
               </div>
             )}
