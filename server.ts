@@ -1,21 +1,20 @@
 import express from 'express';
-import { jobEngine } from './core/bud/JobEngine.ts';
-import { providerRouter } from './core/provider-router/providerRouter.ts';
-import { toolRegistry } from './core/tool-registry/toolRegistry.ts';
-import { sandboxManager } from './infrastructure/sandbox/sandboxManager.ts';
-import { previewManager } from './core/preview-engine/PreviewManager.ts';
-import { interactiveAuditEngine } from './core/interaction-registry/interactiveAuditEngine.ts';
-import { commandRouter } from './core/bud/CommandRouter.ts';
-import { githubProvider } from './core/providers/githubProvider.ts';
-import { deploymentProvider } from './core/providers/deploymentProvider.ts';
-import { runComprehensiveQA } from './server/engines/qaEngine.ts';
-import { runBudIntake, IntakeMessage } from './core/bud/budIntake.ts';
-import { PLAN_CATALOG } from './server/billing/planCatalog.ts';
-import { reserveApiCredits, getApiUsage } from './server/billing/apiCreditLedger.ts';
-import { searchPublicLeads } from './server/leads/leadSearchProvider.ts';
-import { ProjectAsset, ProjectAssetKind } from './src/types/engrenagem.ts';
-import { getBudRuntimeHealth } from './server/engines/budRuntime.ts';
-import { isFirestoreConfigured } from './server/persistence/firestoreStore.ts';
+import { createServer } from 'vite';
+import { jobEngine } from './core/bud/JobEngine';
+import { providerRouter } from './core/provider-router/providerRouter';
+import { toolRegistry } from './core/tool-registry/toolRegistry';
+import { sandboxManager } from './infrastructure/sandbox/sandboxManager';
+import { previewManager } from './core/preview-engine/PreviewManager';
+import { interactiveAuditEngine } from './core/interaction-registry/interactiveAuditEngine';
+import { commandRouter } from './core/bud/CommandRouter';
+import { githubProvider } from './core/providers/githubProvider';
+import { deploymentProvider } from './core/providers/deploymentProvider';
+import { runComprehensiveQA } from './server/engines/qaEngine';
+import { runBudIntake, IntakeMessage } from './core/bud/budIntake';
+import { PLAN_CATALOG } from './server/billing/planCatalog';
+import { reserveApiCredits, getApiUsage } from './server/billing/apiCreditLedger';
+import { searchPublicLeads } from './server/leads/leadSearchProvider';
+import { ProjectAsset, ProjectAssetKind } from './src/types/engrenagem';
 
 function normalizeAssets(input: unknown): ProjectAsset[] {
   if (!Array.isArray(input)) return [];
@@ -32,7 +31,7 @@ function normalizeAssets(input: unknown): ProjectAsset[] {
   });
 }
 
-export async function createApp() {
+export async function createApp(options: { withVite?: boolean } = {}) {
   const app = express();
   app.use(express.json({ limit: '50mb' }));
 
@@ -67,7 +66,7 @@ export async function createApp() {
   });
 
   // 1. Create a new Generation Job / Project
-  app.post('/api/generation/jobs', async (req, res) => {
+  app.post('/api/generation/jobs', (req, res) => {
     try {
       const { prompt, projectId, assets = [] } = req.body;
       if (!prompt || typeof prompt !== 'string') {
@@ -83,16 +82,13 @@ export async function createApp() {
 
       const safeAssets = normalizeAssets(assets);
       const { project, job } = jobEngine.createJob(prompt, projectId, safeAssets);
-      const completedJob = await jobEngine.waitForJob(job.id);
-      const completedProject = await jobEngine.loadProject(project.id);
       res.setHeader('X-Credits-Charged', String(reservation.charged));
       res.setHeader('X-Credits-Remaining', String(reservation.remaining));
       res.json({
         jobId: job.id,
         projectId: project.id,
-        status: completedJob?.status || job.status,
-        job: completedJob || job,
-        project: completedProject || project
+        status: job.status,
+        project
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message || 'Erro ao criar job.' });
@@ -100,8 +96,8 @@ export async function createApp() {
   });
 
   // 2. Query status of a Generation Job
-  app.get('/api/generation/jobs/:id', async (req, res) => {
-    const job = await jobEngine.loadJob(req.params.id);
+  app.get('/api/generation/jobs/:id', (req, res) => {
+    const job = jobEngine.getJob(req.params.id);
     if (!job) {
       return res.status(404).json({ error: 'Job não encontrado.' });
     }
@@ -123,14 +119,14 @@ export async function createApp() {
   });
 
   // 5. BUD Chat / Command execution on existing project
-  app.post('/api/bud/run', async (req, res) => {
+  app.post('/api/bud/run', (req, res) => {
     try {
       const { projectId, message } = req.body;
       if (!projectId || !message) {
         return res.status(400).json({ error: 'projectId e message são obrigatórios.' });
       }
 
-      const project = await jobEngine.loadProject(projectId);
+      const project = jobEngine.getProject(projectId);
       if (!project) {
         return res.status(404).json({ error: 'Projeto não encontrado.' });
       }
@@ -141,12 +137,10 @@ export async function createApp() {
       if (!reservation.allowed) return res.status(429).json({ error: 'Créditos diários insuficientes para editar este projeto.', usage: getApiUsage(uid, planId) });
 
       const job = jobEngine.runEdit(projectId, message);
-      const completedJob = await jobEngine.waitForJob(job.id);
       res.json({
         jobId: job.id,
         projectId,
-        status: completedJob?.status || job.status,
-        job: completedJob || job
+        status: job.status
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message || 'Erro ao processar comando com BUD.' });
@@ -163,20 +157,6 @@ export async function createApp() {
       return res.status(400).json({ error: 'Histórico de conversa inválido.' });
     }
     res.json(runBudIntake(message, history));
-  });
-
-  // 5b. Supervisor health — nunca retorna segredos ou tokens.
-  app.get('/api/bud/health', (_req, res) => {
-    const runtime = getBudRuntimeHealth();
-    res.json({
-      ...runtime,
-      firestore: isFirestoreConfigured(),
-      repair: true,
-      qa: true,
-      projectBrain: true,
-      toolRegistry: toolRegistry.listTools().length > 0,
-      provider: providerRouter.getProvider('gemini')?.status || 'NOT_CONFIGURED'
-    });
   });
 
   // 6. Get Project by ID
@@ -440,5 +420,26 @@ export async function createApp() {
     res.json(report);
   });
 
+  // Vite is mounted only for local development. Vercel uses api/index.ts.
+  if (options.withVite) {
+    const vite = await createServer({
+      server: { middlewareMode: true },
+      appType: 'spa'
+    });
+    app.use(vite.middlewares);
+  }
+
   return app;
 }
+
+async function startServer() {
+  const app = await createApp({ withVite: true });
+  const port = Number(process.env.PORT || 3000);
+  app.listen(port, () => {
+    console.log(`Engrenagem AI Dev Server operacional na porta ${port}`);
+  });
+}
+
+startServer().catch(err => {
+  console.error('Falha ao iniciar o servidor Engrenagem AI:', err);
+});
