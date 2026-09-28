@@ -79,18 +79,9 @@ export class RepairEngine {
       }
     }
 
-    // Default syntax or general repair
+    // Sem uma regra de reparo específica, não alegar que um patch foi aplicado.
     return {
-      canRepair: true,
-      repairAttempt: {
-        attemptNumber: currentAttempts + 1,
-        errorType: 'SYNTAX',
-        targetFile: 'src/App.tsx',
-        diagnosis: `Diagnóstico automático de falha: ${errorMessage}`,
-        patchSummary: 'Re-sincronização de árvore de componentes e checagem de tipos estritos.',
-        succeeded: true
-      },
-      repairedFiles: updatedFiles
+      canRepair: false
     };
   }
 }

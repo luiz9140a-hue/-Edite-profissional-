@@ -20,18 +20,20 @@ export class DeploymentProvider {
 
     const tokenName = target === 'vercel' ? 'VERCEL_TOKEN' : target === 'netlify' ? 'NETLIFY_AUTH_TOKEN' : undefined;
     const configured = !tokenName || Boolean(process.env[tokenName]);
+    const adapterImplemented = false;
+    const canDeploy = configured && adapterImplemented;
     const deployment: DeploymentStatus = {
       id: deploymentId,
       projectId,
       target,
-      state: configured ? 'DEPLOYED' : 'FAILED',
-      url: configured ? (target === 'vercel' ? `https://${projectId}.vercel.app` : target === 'netlify' ? `https://${projectId}.netlify.app` : `https://${projectId}.engrenagem.app`) : undefined,
+      state: canDeploy ? 'DEPLOYED' : 'FAILED',
+      url: undefined,
       startedAt: now,
       completedAt: now,
       logs: [
         `[DeploymentEngine] Kit de publicação preparado para ${target}.`,
-        configured ? `[DeploymentEngine] Credencial ${tokenName || 'do ambiente'} encontrada; publicação liberada.` : `[DeploymentEngine] Credencial ${tokenName} ausente; nenhum deploy externo foi executado.`,
-        configured ? `[DeploymentEngine] URL atribuída: ${target === 'vercel' ? `https://${projectId}.vercel.app` : target === 'netlify' ? `https://${projectId}.netlify.app` : `https://${projectId}.engrenagem.app`}` : '[DeploymentEngine] Configure a credencial do provedor e tente novamente.'
+        !configured ? `[DeploymentEngine] Credencial ${tokenName} ausente; nenhum deploy externo foi executado.` : `[DeploymentEngine] Credencial ${tokenName || 'do ambiente'} encontrada, mas o adaptador de deploy ainda não está implementado; nenhum deploy externo foi executado.`,
+        canDeploy ? '[DeploymentEngine] Deploy confirmado pelo provedor.' : '[DeploymentEngine] Nenhuma URL foi atribuída porque não existe confirmação real do provedor.'
       ]
     };
 
