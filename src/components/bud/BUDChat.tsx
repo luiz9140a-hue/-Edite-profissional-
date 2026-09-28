@@ -26,7 +26,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function BUDChat({ projectId, onProjectReady }: Props) {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Sou o BUD SupremoBuild. Diga o que deseja criar ou alterar neste projeto.' }
+    { role: 'assistant', content: 'Sou o BUD Autonomous Engine. Defina um objetivo e eu coordenarei análise, código, testes, QA e Preview.' }
   ]);
   const [input, setInput] = useState('');
   const [jobStatus, setJobStatus] = useState<string | null>(null);
@@ -101,7 +101,7 @@ export default function BUDChat({ projectId, onProjectReady }: Props) {
         ))}
         {jobStatus && (
           <div className="text-sm text-blue-400">
-            BUD SupremoBuild • {STATUS_LABELS[jobStatus] || jobStatus}...
+            BUD Autonomous Engine • {STATUS_LABELS[jobStatus] || jobStatus}...
           </div>
         )}
         {error && <div className="text-sm text-red-400">{error}</div>}
@@ -112,7 +112,7 @@ export default function BUDChat({ projectId, onProjectReady }: Props) {
           onChange={event => setInput(event.target.value)}
           onKeyDown={event => { if (event.key === 'Enter') void sendMessage(); }}
           className="w-full p-2 rounded bg-gray-900 text-white outline-none focus:ring-2 focus:ring-blue-600"
-          placeholder={isSending ? 'BUD executando...' : 'Diga ao BUD o que criar ou alterar...'}
+          placeholder={isSending ? 'BUD executando...' : 'Defina o objetivo do motor autônomo...'}
           disabled={isSending || !projectId}
         />
         <button
@@ -120,7 +120,7 @@ export default function BUDChat({ projectId, onProjectReady }: Props) {
           disabled={isSending || !input.trim() || !projectId}
           className="mt-2 w-full bg-blue-600 hover:bg-blue-500 p-2 rounded text-white disabled:opacity-50"
         >
-          {isSending ? 'BUD executando...' : 'Enviar para o BUD'}
+          {isSending ? 'BUD executando...' : 'Executar objetivo'}
         </button>
       </div>
     </div>

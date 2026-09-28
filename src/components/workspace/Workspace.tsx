@@ -215,7 +215,7 @@ function WorkspaceContent() {
   const handleAutoRepair = async () => {
     if (!project || actionLock) return;
     setActionLock('REPAIRING');
-    setActionFeedback({ message: 'BUD diagnosticando e aplicando autocorreção nos arquivos...', type: 'info' });
+    setActionFeedback({ message: 'Motor autônomo diagnosticando e aplicando autocorreção...', type: 'info' });
     try {
       const res = await fetch(`/api/projects/${project.id}/repair`, { method: 'POST' });
       const data = await res.json();
@@ -582,26 +582,26 @@ function WorkspaceContent() {
             </div>
           )}
 
-          {/* TAB 2: BUD CHAT (Mobile Conversational App Style) */}
+          {/* TAB 2: MOTOR AUTÔNOMO (Execução Full Stack) */}
           {mobileTab === 'bud' && (
             <div className="flex-1 flex flex-col h-full bg-slate-950">
-              {/* Chat Header */}
+              {/* Autonomous Engine Header */}
               <div className="h-10 px-4 border-b border-slate-850 bg-slate-900/80 flex items-center justify-between text-xs">
                 <div className="flex items-center space-x-2">
                   <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping"></span>
-                  <span className="font-bold text-white">BUD Conversational</span>
+                  <span className="font-bold text-white">BUD Autonomous Engine</span>
                 </div>
                 <span className="text-[10px] text-emerald-400 font-mono font-bold">ONLINE</span>
               </div>
 
-              {/* Chat Message Stream */}
+              {/* Execution Timeline */}
               <div className="flex-1 overflow-y-auto p-3 space-y-3 text-xs">
                 <div className="bg-slate-900 border border-slate-800 p-3 rounded-2xl text-slate-300 space-y-1.5">
                   <div className="font-bold text-blue-400 flex items-center gap-1.5">
-                    <Cpu className="w-4 h-4" /> BUD Agent
+                    <Cpu className="w-4 h-4" /> BUD • Autonomous Engineering Core
                   </div>
                   <p className="leading-relaxed">
-                    O que você gostaria de construir ou modificar nesta aplicação?
+                    Descreva o objetivo. O BUD vai planejar, construir, testar e aplicar as alterações automaticamente.
                   </p>
                   {/* Quick Pills */}
                   <div className="flex flex-wrap gap-1.5 pt-2">
@@ -640,7 +640,7 @@ function WorkspaceContent() {
                 <div ref={chatMessagesEndRef} />
               </div>
 
-              {/* Chat Input Bar */}
+              {/* Autonomous Command Input */}
               <div className="p-2 border-t border-slate-850 bg-slate-950/95">
                 <div className="relative flex items-center">
                   <input
@@ -649,14 +649,14 @@ function WorkspaceContent() {
                     onChange={(e) => setChatInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
                     disabled={isProcessing}
-                    placeholder={isProcessing ? 'BUD executando...' : 'Digite sua instrução...'}
+                    placeholder={isProcessing ? 'BUD executando...' : 'Descreva o objetivo para o motor autônomo...'}
                     className="w-full bg-slate-900 border border-slate-800 text-white rounded-xl py-3 pl-3 pr-12 text-xs placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition min-h-[44px]"
                   />
                   <button
                     onClick={() => handleSendChat()}
                     disabled={isProcessing || !chatInput.trim()}
                     className="absolute right-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white p-2 rounded-lg transition min-h-[36px] min-w-[36px] flex items-center justify-center"
-                    aria-label="Enviar comando para BUD"
+                    aria-label="Executar objetivo no motor autônomo"
                   >
                     <Send className="w-4 h-4" />
                   </button>
@@ -865,7 +865,7 @@ function WorkspaceContent() {
             {/* Right half: BUD Chat */}
             <div className="w-1/2 flex flex-col">
               <div className="h-8 border-b border-slate-800 px-3 flex items-center text-xs font-bold text-slate-300 bg-slate-900/60">
-                <Cpu className="w-3.5 h-3.5 text-blue-400 mr-1.5" /> BUD Copilot
+                <Cpu className="w-3.5 h-3.5 text-blue-400 mr-1.5" /> BUD Autonomous Engine
               </div>
               <div className="flex-1 overflow-y-auto p-2 space-y-2 text-xs">
                 {projectHistory.map((h) => (
@@ -1168,7 +1168,7 @@ function WorkspaceContent() {
             </div>
           </div>
 
-          {/* Right Column: BUD Copilot Chat (Resizable) */}
+          {/* Right Column: BUD Autonomous Engine Chat (Resizable) */}
           <div
             style={{ width: `${budSidebarWidth}px` }}
             className="border-l border-slate-850 bg-slate-950 flex flex-col flex-shrink-0 relative"
@@ -1177,22 +1177,22 @@ function WorkspaceContent() {
             <div
               onMouseDown={() => setIsDraggingRight(true)}
               className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-500/50 transition z-10"
-              title="Arrastar para redimensionar chat do BUD"
+              title="Arrastar para redimensionar o motor autônomo"
             />
 
             <div className="h-10 border-b border-slate-850 px-4 flex items-center justify-between text-xs font-bold text-slate-300">
               <div className="flex items-center space-x-2">
                 <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-                <span>BUD Copilot</span>
+                <span>BUD Autonomous Engine</span>
               </div>
               <span className="text-[10px] text-slate-500 font-mono">Agent Runtime</span>
             </div>
 
-            {/* Chat Messages Stream */}
+            {/* Autonomous Execution Timeline */}
             <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 text-xs">
               <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl text-slate-300 space-y-2">
                 <div className="font-bold text-blue-400 flex items-center gap-1.5">
-                  <Cpu className="w-4 h-4" /> BUD Agent
+                  <Cpu className="w-4 h-4" /> BUD • Autonomous Engineering Core
                 </div>
                 <p className="leading-relaxed">
                   Olá! Analisei sua instrução e construí a aplicação. Você pode me pedir alterações em linguagem natural a qualquer momento:
@@ -1232,7 +1232,7 @@ function WorkspaceContent() {
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
                   disabled={isProcessing}
-                  placeholder={isProcessing ? 'BUD está executando...' : 'O que você quer alterar?'}
+                  placeholder={isProcessing ? 'Motor autônomo executando pipeline completo...' : 'Qual objetivo o motor deve executar?'}
                   className="w-full bg-slate-900 border border-slate-800 text-white rounded-xl py-2.5 pl-3 pr-10 text-xs placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition"
                 />
                 <button
