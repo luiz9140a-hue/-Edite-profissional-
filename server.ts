@@ -16,6 +16,8 @@ import { reserveApiCredits, getApiUsage } from './server/billing/apiCreditLedger
 import { searchPublicLeads } from './server/leads/leadSearchProvider';
 import { ProjectAsset, ProjectAssetKind } from './src/types/engrenagem';
 import { getDocument, publishDocument, saveDocument } from './core/visual-builder/documentStore';
+import { applyOperation, type VisualOperation } from './core/visual-builder/operations';
+import { listRegisteredComponents } from './core/visual-builder/componentRegistry';
 
 function normalizeAssets(input: unknown): ProjectAsset[] {
   if (!Array.isArray(input)) return [];
@@ -62,6 +64,19 @@ export async function createApp(options: { withVite?: boolean } = {}) {
 
   app.post('/api/visual/documents/:id/publish', (req, res) => {
     res.json(publishDocument(req.params.id));
+  });
+
+  app.get('/api/visual/components', (_req, res) => {
+    res.json({ components: listRegisteredComponents() });
+  });
+
+  app.post('/api/visual/documents/:id/operations', (req, res) => {
+    const operation = req.body as VisualOperation;
+    if (!operation || !['insert', 'remove', 'update'].includes(operation.type)) {
+      return res.status(400).json({ error: 'Operação visual inválida.' });
+    }
+    const updated = applyOperation(getDocument(req.params.id), operation);
+    res.json(saveDocument(updated));
   });
 
   // 0. Catálogo público da página de vendas
