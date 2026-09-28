@@ -2,6 +2,7 @@ import { DefaultCopilotChatDialogProps } from "@/wab/client/plasmic/plasmic_kit_
 import { ApiProject, CopilotChatOpenOpts } from "@/wab/shared/ApiSchema";
 
 export interface CopilotChatDialogProps extends DefaultCopilotChatDialogProps {
+  hiddenByModal?: boolean;
   project: ApiProject;
   chatOpenOpts?: CopilotChatOpenOpts;
   canStartNewChat: boolean;

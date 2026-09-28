@@ -83,6 +83,12 @@ export function pickFailedOperation(
   return failure.operation ?? (submittedDomain ? "register" : "remove");
 }
 
+export interface PlasmicHostingSettings {
+  textFiles?: Record<string, string>;
+  favicon?: { url: string; mimeType?: string };
+  [key: string]: unknown;
+}
+
 // Shared instance for validating Plasmic Hosting domains/subdomains.
 // Centralize the configuration so all server and shared utilities use
 // the same suffix (from DEVFLAGS).

@@ -47,7 +47,7 @@ import {
   isKnownVarRef,
 } from "@/wab/shared/model/classes";
 import L, { last } from "lodash";
-import mime from "mime/lite";
+import mime from "mime";
 import { makeImportedPictureRef } from "src/wab/shared/codegen/react-p/image";
 
 export function extractUsedIconAssetsForComponents(
@@ -499,7 +499,7 @@ export function makePictureAssetFileName(
 function derivePictureExtension(asset: ImageAsset, parsed?: ParsedDataUrl) {
   assert(asset.dataUri, "Must not be an empty asset");
   parsed = parsed ?? parseDataUrl(asset.dataUri);
-  return mime.getExtension(parsed.contentType);
+  return mime.extension(parsed.contentType);
 }
 
 export function makeIconImports(
@@ -594,6 +594,6 @@ export function getImageFilename(asset: ImageAsset) {
     contentType = "image/jpeg";
   }
 
-  const extension = mime.getExtension(contentType);
+  const extension = mime.extension(contentType);
   return `${asset.name}.${extension}`;
 }

@@ -68,6 +68,7 @@
   "author": "Plasmic Team",
   "gitHead": "14cfee473c6a27212c54d536a8bd531c84e9fb68",
   "devDependencies": {
+    "@octokit/openapi-types": "^29.0.1",
     "@plasmicapp/cli": "^0.1.380",
     "@rsbuild/core": "1.7.6",
     "@rsbuild/plugin-react": "1.4.6",
@@ -133,6 +134,7 @@
     "concurrently": "^5.3.0",
     "fake-indexeddb": "^6.2.5",
     "graphql-ws": "5.16.0",
+    "html-webpack-plugin": "^5.6.8",
     "http-server": "^14.1.1",
     "jest-extended": "^6.0.0",
     "monaco-editor-webpack-plugin": "7.1.0",

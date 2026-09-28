@@ -30,6 +30,7 @@
       // Absolute import paths like "@/wab/shared/common"
       // Should match "resolve.alias" in webpack.config.js
       "@/*": ["./src/*"],
+      "@plasmic-shared/hosting": ["./src/wab/shared/hosting.ts"],
       // Legacy bare src/ imports (previously resolved via baseUrl)
       "src/*": ["./src/*"],
       // socket.io only exports root; allow sub-path imports for module augmentations
