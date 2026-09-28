@@ -1,7 +1,9 @@
-import { createApp } from '../server.ts';
+import { createApp } from '../server';
 
-const appPromise = createApp();
+let appPromise: ReturnType<typeof createApp> | undefined;
 
 export default async function handler(req: any, res: any) {
-  return (await appPromise)(req, res);
+  appPromise ||= createApp();
+  const app = await appPromise;
+  return app(req, res);
 }

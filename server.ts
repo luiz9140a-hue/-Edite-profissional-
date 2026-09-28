@@ -440,6 +440,8 @@ async function startServer() {
   });
 }
 
-startServer().catch(err => {
-  console.error('Falha ao iniciar o servidor Engrenagem AI:', err);
-});
+if (!process.env.VERCEL) {
+  startServer().catch(err => {
+    console.error('Falha ao iniciar o servidor Engrenagem AI:', err);
+  });
+}
