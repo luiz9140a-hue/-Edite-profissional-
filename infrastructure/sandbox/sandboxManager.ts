@@ -45,6 +45,10 @@ export class SandboxManager {
 
   public validateCommand(command: string): { allowed: boolean; reason?: string } {
     const baseCmd = command.trim().split(/\s+/)[0];
+
+    if (!baseCmd || !this.allowedCommands.has(baseCmd)) {
+      return { allowed: false, reason: `Comando '${baseCmd || '(vazio)'}' não está na allowlist do Sandbox.` };
+    }
     
     for (const pattern of this.blockedPatterns) {
       if (pattern.test(command)) {

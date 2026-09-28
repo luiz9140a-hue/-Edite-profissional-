@@ -1,5 +1,7 @@
 import fs from 'fs';
 import path from 'path';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import {
   GenerationJob,
   IntentContract,
@@ -23,12 +25,14 @@ import { ProjectClassifier } from '../project-forge/ProjectClassifier';
 import { ProjectBrainManager } from '../project-forge/ProjectBrainManager';
 import { generateAiVisual, shouldGenerateAiVisual } from '../../server/visual/imageGenerationProvider';
 import { supremeExecutorRuntime } from '../supreme-build/SupremeExecutorRuntime';
+import { saveJob, saveProject } from '../../server/persistence/firestoreStore';
 
 export class JobEngine {
   private jobs: Map<string, GenerationJob> = new Map();
   private projects: Map<string, Project> = new Map();
   private plans: Map<string, ProjectPlan> = new Map();
   private previewHtmlCache: Map<string, string> = new Map();
+  private readonly execFileAsync = promisify(execFile);
 
   constructor() {
     const writableRoot = process.env.VERCEL ? '/tmp' : process.cwd();
@@ -169,6 +173,7 @@ export class JobEngine {
 
     this.projects.set(projectId, project);
     this.jobs.set(jobId, job);
+    await this.persistCheckpoint(job, project);
 
     eventEngine.emit(projectId, jobId, 'JOB_CREATED', { prompt, projectId });
 
@@ -285,6 +290,10 @@ export class JobEngine {
       job.updatedAt = new Date().toISOString();
     };
 
+    const persist = async () => {
+      await this.persistCheckpoint(job, project);
+    };
+
     try {
       // 1. ANALYZING
       if (this.isCancelled(job)) return;
@@ -385,8 +394,20 @@ export class JobEngine {
       job.progress = 75;
       job.currentStep = 'Compilando e verificando integridade de código e sintaxe...';
       eventEngine.emit(projectId, jobId, 'BUILD_STARTED');
-      addLog('agent', `[BuildEngine] Validando compilação do bundle React 19...`, 'BUILDING');
-      await this.sleep(300);
+      addLog('agent', `[BuildEngine] Executando npm install/lint/typecheck/build no workspace gerado...`, 'BUILDING');
+      const buildResult = await this.runRealBuild(sandboxManager.getWorkspaceDir(projectId));
+      buildResult.logs.forEach(log => addLog(buildResult.ok ? 'info' : 'error', `[BuildEngine] ${log}`, 'BUILDING'));
+      if (!buildResult.ok) {
+        job.status = 'FAILED';
+        job.progress = 100;
+        job.error = buildResult.error || 'Build real falhou.';
+        job.currentStep = 'Build real falhou; projeto bloqueado antes do QA.';
+        project.status = 'FAILED';
+        eventEngine.emit(projectId, jobId, 'BUILD_FAILED', { error: job.error });
+        addLog('error', `[BuildEngine] ${job.error}`, 'FAILED');
+        await persist();
+        return;
+      }
       eventEngine.emit(projectId, jobId, 'BUILD_SUCCEEDED');
 
       // 6. TESTING
@@ -447,8 +468,9 @@ export class JobEngine {
         job.progress = 100;
         job.currentStep = 'Geração interrompida: o projeto ainda falha nas validações de QA.';
         job.error = 'O projeto não passou em todas as validações obrigatórias.';
-        project.status = 'FAILED';
-        addLog('error', `[JobEngine] Projeto bloqueado antes da publicação: score ${finalReadiness.score}/100.`, 'FAILED');
+      project.status = 'FAILED';
+      addLog('error', `[JobEngine] Projeto bloqueado antes da publicação: score ${finalReadiness.score}/100.`, 'FAILED');
+        await persist();
         return;
       }
       job.status = 'READY';
@@ -464,17 +486,75 @@ export class JobEngine {
         timestamp: new Date().toISOString(),
         changesSummary: isEdit ? `Modificação aplicada: "${prompt}"` : 'Criação inicial do projeto'
       });
+      await persist();
     } catch (err: any) {
       job.status = 'FAILED';
       job.error = err.message || 'Falha inesperada no pipeline de execução.';
       eventEngine.emit(projectId, jobId, 'PROJECT_FAILED', { error: job.error });
       addLog('error', `[JobEngine] Erro fatal: ${job.error}`, 'FAILED');
       project.status = 'FAILED';
+      await persist();
+    }
+  }
+
+  private async persistCheckpoint(job: GenerationJob, project: Project): Promise<void> {
+    try {
+      await Promise.all([saveJob(job), saveProject(project)]);
+    } catch (error: any) {
+      // Persistência é best-effort no modo local, mas o erro fica registrado.
+      job.logs.push({
+        id: `persist-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        level: 'warn',
+        message: `[Firestore] Checkpoint não persistido: ${error.message || 'erro desconhecido'}`,
+        step: job.status
+      });
     }
   }
 
   private sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private async runRealBuild(workspacePath: string): Promise<{ ok: boolean; logs: string[]; error?: string }> {
+    const packagePath = path.join(workspacePath, 'package.json');
+    if (!fs.existsSync(packagePath)) {
+      return { ok: false, logs: [], error: 'package.json não encontrado no workspace gerado.' };
+    }
+
+    let packageJson: { scripts?: Record<string, string> };
+    try {
+      packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8')) as { scripts?: Record<string, string> };
+    } catch (error: any) {
+      return { ok: false, logs: [], error: `package.json inválido: ${error.message}` };
+    }
+
+    const commands = [
+      ['npm install', ['install', '--no-audit', '--no-fund']],
+      ...(packageJson.scripts?.lint ? [['npm run lint', ['run', 'lint']] as [string, string[]]] : []),
+      ...(packageJson.scripts?.typecheck ? [['npm run typecheck', ['run', 'typecheck']] as [string, string[]]] : []),
+      ['npm run build', ['run', 'build']]
+    ] as [string, string[]][];
+    const logs: string[] = [];
+
+    for (const [label, args] of commands) {
+      const startedAt = Date.now();
+      try {
+        const result = await this.execFileAsync('npm', args, {
+          cwd: workspacePath,
+          timeout: 180_000,
+          maxBuffer: 8 * 1024 * 1024,
+          env: { ...process.env, CI: '1' }
+        });
+        logs.push(`${label} PASS (${Date.now() - startedAt}ms)\n${result.stdout.slice(-4000)}`);
+      } catch (error: any) {
+        const output = `${error.stdout || ''}\n${error.stderr || ''}`.slice(-8000);
+        logs.push(`${label} FAIL (${Date.now() - startedAt}ms)\n${output}`);
+        return { ok: false, logs, error: `${label} falhou com exit code ${error.code ?? 'desconhecido'}.` };
+      }
+    }
+
+    return { ok: true, logs };
   }
 }
 
