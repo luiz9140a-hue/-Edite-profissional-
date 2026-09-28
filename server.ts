@@ -37,6 +37,15 @@ export async function createApp(options: { withVite?: boolean } = {}) {
 
   // --- API Endpoints ---
 
+  app.get('/api/health', (_req, res) => {
+    res.json({
+      status: 'ok',
+      service: 'edite-profissional',
+      runtime: process.env.VERCEL ? 'vercel' : 'local',
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // 0. Catálogo público da página de vendas
   app.get('/api/billing/plans', (_req, res) => {
     res.json({ plans: Object.values(PLAN_CATALOG).filter(plan => plan.id !== 'admin_lifetime') });

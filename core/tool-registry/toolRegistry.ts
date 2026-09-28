@@ -97,14 +97,14 @@ export class ToolRegistry {
       category: 'git',
       inputSchema: { projectId: 'string', message: 'string' },
       execute: async () => {
-        if (providerRouter.getStatus('github') !== 'AVAILABLE') {
-          return {
-            status: 'NOT_CONFIGURED',
-            reason: 'GitHub Provider não configurado com credenciais OAuth.',
-            requiredConfiguration: ['GITHUB_TOKEN']
-          };
-        }
-        return { status: 'SUCCESS', commitHash: 'git-commit-mock' };
+        const status = providerRouter.getStatus('github');
+        return {
+          status: status === 'AVAILABLE' ? 'BLOCKED_NOT_IMPLEMENTED' : 'NOT_CONFIGURED',
+          reason: status === 'AVAILABLE'
+            ? 'Credencial detectada, mas o executor real de commit/push ainda não está implementado.'
+            : 'GitHub Provider não configurado com credenciais OAuth.',
+          requiredConfiguration: ['GITHUB_TOKEN']
+        };
       }
     });
 
@@ -115,17 +115,10 @@ export class ToolRegistry {
       category: 'execution',
       inputSchema: { projectId: 'string', target: 'string' },
       execute: async ({ target = 'cloud_run' }) => {
-        if (target === 'vercel') {
-          return {
-            status: 'NOT_CONFIGURED',
-            reason: 'Vercel Provider não configurado.',
-            requiredConfiguration: ['VERCEL_TOKEN']
-          };
-        }
         return {
-          status: 'DEPLOYED',
-          url: process.env.APP_URL || 'http://localhost:3000',
-          target: 'cloud_run'
+          status: 'BLOCKED_NOT_IMPLEMENTED',
+          reason: `Nenhum executor real de deploy está implementado para ${target}; não foi feita publicação nem atribuída URL.`,
+          requiredConfiguration: target === 'vercel' ? ['VERCEL_TOKEN'] : []
         };
       }
     });
