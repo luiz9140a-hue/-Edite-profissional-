@@ -1,0 +1,12 @@
+packages:
+  - "packages/*"
+  - "packages/create-plasmic-app/cpa-out/*"
+  - "plasmicpkgs/*"
+  - "plasmicpkgs/commerce-providers/*"
+  - "examples/*"
+  - "platform/*"
+  - "platform/canvas-packages/*"
+  - "platform/loader-bundle-env/*"
+  - "platform/loader-tests/src/*/*"
+  - "platform/wab"
+  - "apps/*"

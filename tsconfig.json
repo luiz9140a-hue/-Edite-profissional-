@@ -25,5 +25,15 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "packages",
+    "platform",
+    "plasmicpkgs",
+    "examples",
+    "ai",
+    "scripts"
+  ]
 }
