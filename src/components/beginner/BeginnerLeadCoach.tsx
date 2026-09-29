@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowRight, Check, Clipboard, ExternalLink, MapPin, Search, Sparkles } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
+import { budClient } from '../../lib/budClient';
 
 interface Lead { id: string; name: string; address: string; lat: number; lon: number; mapUrl: string; category?: string; phone?: string; website?: string; }
 
@@ -24,7 +25,7 @@ export default function BeginnerLeadCoach() {
 
   async function searchLeads(event: React.FormEvent) {
     event.preventDefault(); setLoading(true); setError('');
-    try { const response = await fetch(`/api/leads/search?q=${encodeURIComponent(query)}&near=${encodeURIComponent(near)}`, { headers }); const data = await response.json(); if (!response.ok) throw new Error(data.error); setLeads(data.leads || []); setStep(2); }
+    try { const data = await budClient.searchLeads(query, near); setLeads(data.leads || []); setStep(2); }
     catch (err: any) { setError(err.message || 'Não foi possível buscar leads.'); }
     finally { setLoading(false); }
   }

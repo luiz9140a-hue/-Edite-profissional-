@@ -13,6 +13,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { Project } from '../../types/engrenagem';
+import { budClient, buildPreviewDocument } from '../../lib/budClient';
 import ResponsivePreviewController, {
   DeviceMode,
   PhonePreset,
@@ -47,12 +48,37 @@ export default function PreviewStage({
   } | null>(null);
   const [isRestarting, setIsRestarting] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [srcDoc, setSrcDoc] = useState<string>('');
 
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Health check on project mount or key change
+  const isConvexMode = budClient.mode() === 'convex';
+
+  // Build the preview document (Convex mode renders locally from project files)
   useEffect(() => {
+    let isMounted = true;
+    if (isConvexMode) {
+      budClient
+        .getProject(project.id)
+        .then((projectData) => {
+          if (isMounted && projectData) {
+            setSrcDoc(buildPreviewDocument(projectData as never));
+            setPreviewHealth('ONLINE');
+          }
+        })
+        .catch(() => {
+          if (isMounted) setPreviewHealth('OFFLINE');
+        });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [project.id, project.updatedAt, previewKey, isConvexMode]);
+
+  // Health check on project mount or key change (REST mode only)
+  useEffect(() => {
+    if (isConvexMode) return;
     let isMounted = true;
 
     const runHealthCheck = async () => {
@@ -76,7 +102,7 @@ export default function PreviewStage({
       isMounted = false;
       clearInterval(interval);
     };
-  }, [project.id, previewKey]);
+  }, [project.id, previewKey, isConvexMode]);
 
   // Listen to message events from iframe
   useEffect(() => {
@@ -87,7 +113,7 @@ export default function PreviewStage({
         console.warn('[PreviewStage] Erro capturado no iframe do projeto:', event.data);
         setRuntimeError({
           type: event.data.errorType || 'RUNTIME_ERROR',
-          file: event.data.file || 'src/App.tsx',
+          file: event.data.file || 'index.html',
           line: event.data.line,
           message: event.data.message || 'Exceção não tratada no código do projeto gerado.'
         });
@@ -102,9 +128,13 @@ export default function PreviewStage({
   const handleManualRestart = async () => {
     setIsRestarting(true);
     try {
-      const res = await fetch(`/api/projects/${project.id}/preview/restart`, { method: 'POST' });
-      const data = await res.json();
-      setRestartsCount(data.restartsCount || restartsCount + 1);
+      if (!isConvexMode) {
+        const res = await fetch(`/api/projects/${project.id}/preview/restart`, { method: 'POST' });
+        const data = await res.json();
+        setRestartsCount(data.restartsCount || restartsCount + 1);
+      } else {
+        setRestartsCount(restartsCount + 1);
+      }
       setRuntimeError(null);
       setPreviewKey(Date.now());
       setPreviewHealth('ONLINE');
@@ -116,6 +146,15 @@ export default function PreviewStage({
   };
 
   const handleOpenNewTab = () => {
+    if (isConvexMode) {
+      const win = window.open('', '_blank');
+      if (win) {
+        win.document.open();
+        win.document.write(srcDoc || '<html><body>Carregando preview...</body></html>');
+        win.document.close();
+      }
+      return;
+    }
     window.open(`/preview/${project.id}`, '_blank', 'noopener,noreferrer');
   };
 
@@ -132,6 +171,10 @@ export default function PreviewStage({
 
   // Compute dimensions based on device mode
   const currentPhoneDim = PHONE_PRESETS[phonePreset][orientation];
+
+  const iframeProps = isConvexMode
+    ? { srcDoc: srcDoc || '<!doctype html><html><body style="background:#0A0D14"></body></html>' }
+    : { src: `/api/projects/${project.id}/preview-html?t=${previewKey}` };
 
   return (
     <div
@@ -219,10 +262,10 @@ export default function PreviewStage({
             <iframe
               key={previewKey}
               ref={iframeRef}
-              src={`/api/projects/${project.id}/preview-html?t=${previewKey}`}
               title={`Preview ${project.name}`}
               className="flex-1 w-full h-full border-none bg-black"
               sandbox="allow-scripts allow-forms allow-popups allow-modals"
+              {...iframeProps}
             />
           </div>
         ) : deviceMode === 'phone' ? (
@@ -252,10 +295,10 @@ export default function PreviewStage({
               <iframe
                 key={previewKey}
                 ref={iframeRef}
-                src={`/api/projects/${project.id}/preview-html?t=${previewKey}`}
                 title={`Preview Phone ${project.name}`}
                 className="w-full h-full border-none bg-black"
                 sandbox="allow-scripts allow-forms allow-popups allow-modals"
+                {...iframeProps}
               />
             </div>
 
@@ -278,10 +321,10 @@ export default function PreviewStage({
             <iframe
               key={previewKey}
               ref={iframeRef}
-              src={`/api/projects/${project.id}/preview-html?t=${previewKey}`}
               title={`Preview Tablet ${project.name}`}
               className="flex-1 w-full h-full border-none bg-black"
               sandbox="allow-scripts allow-forms allow-popups allow-modals"
+              {...iframeProps}
             />
           </div>
         ) : (
@@ -298,17 +341,17 @@ export default function PreviewStage({
               </span>
               <div className="flex items-center space-x-1 font-mono text-[10px] text-emerald-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                <span>ONLINE</span>
+                <span>{previewHealth === 'CHECKING' ? 'CHECKING' : 'ONLINE'}</span>
               </div>
             </div>
 
             <iframe
               key={previewKey}
               ref={iframeRef}
-              src={`/api/projects/${project.id}/preview-html?t=${previewKey}`}
               title={`Preview Desktop ${project.name}`}
               className="flex-1 w-full h-full border-none bg-black"
               sandbox="allow-scripts allow-forms allow-popups allow-modals"
+              {...iframeProps}
             />
           </div>
         )}

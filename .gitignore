@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# BUD runtime artifacts (sandbox state, not source)
+.isolate/
+/isolate/
+/workspace/
+*.tsbuildinfo
