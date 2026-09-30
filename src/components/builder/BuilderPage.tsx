@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Eye, Layers3, Save, Send, Plus, Trash2 } from 'lucide-react';
 import type { VisualDocument, VisualNode } from '../../types/visual';
+import { budClient } from '../../lib/budClient';
 import VisualRenderer from './VisualRenderer';
 
 function walk(node: VisualNode, result: VisualNode[] = []) {
@@ -21,9 +22,11 @@ export default function BuilderPage() {
   const selected = nodes.find(node => node.id === selectedId);
 
   useEffect(() => {
-    fetch(`/api/visual/documents/${documentId}`)
-      .then(response => response.json())
-      .then(setDocument)
+    budClient.getVisualDocument(documentId)
+      .then(data => {
+        const doc = data as VisualDocument;
+        setDocument({ ...doc, id: documentId });
+      })
       .catch(() => setMessage('Não foi possível carregar o documento visual.'));
   }, [documentId]);
 
@@ -38,19 +41,29 @@ export default function BuilderPage() {
 
   const save = async () => {
     if (!document) return;
-    const response = await fetch(`/api/visual/documents/${document.id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(document)
+    const saved = await budClient.saveVisualDocument(document.id, {
+      name: document.name,
+      route: document.route,
+      root: document.root,
     });
-    setDocument(await response.json());
+    setDocument({ ...document, ...(saved as object), id: document.id } as VisualDocument);
     setMessage('Documento salvo.');
   };
 
   const publish = async () => {
     if (!document) return;
-    const response = await fetch(`/api/visual/documents/${document.id}/publish`, { method: 'POST' });
-    const published = await response.json();
-    setDocument(published);
-    setMessage('Publicação criada.');
+    try {
+      await budClient.saveVisualDocument(document.id, {
+        name: document.name,
+        route: document.route,
+        root: document.root,
+      });
+      const published = await budClient.publishVisualDocument(documentId);
+      setDocument({ ...document, ...(published as object), id: document.id } as VisualDocument);
+      setMessage('Publicação criada.');
+    } catch (error: any) {
+      setMessage(error?.message || 'Falha ao publicar.');
+    }
   };
 
   const addText = () => {
