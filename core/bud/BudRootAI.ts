@@ -2,6 +2,7 @@ import { runBudSupervisor, type BudMode, type BudSupervisorDecision, getBudRunti
 import { ProjectBrainManager } from '../project-forge/ProjectBrainManager.ts';
 import { planner } from '../planning/planner.ts';
 import { toolRegistry } from '../tool-registry/toolRegistry.ts';
+import { skillRegistry } from '../../server/bud/skills/index.ts';
 
 export type BudRootPhase =
   | 'UNDERSTAND'
@@ -122,9 +123,11 @@ export class BudRootAI {
       planner: plannerReady ? 'READY' : 'BLOCKED',
       projectBrain: brain ? 'READY' : 'BLOCKED',
       toolRegistry: registryReady ? 'READY' : 'BLOCKED',
+      skillRegistry: skillRegistry.list().length > 0 ? 'READY' : 'BLOCKED',
       runtime,
       evidence: {
         registeredTools: toolRegistry.listTools().map(tool => tool.name),
+        registeredSkills: skillRegistry.list().map(skill => skill.id),
         supervisorProvider: runtime.configured ? 'gemini' : 'deterministic'
       }
     } as const;

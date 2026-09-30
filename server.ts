@@ -23,6 +23,7 @@ import { allowRequest, requestId } from './core/platform-bridge/traffic';
 import { budRootAI } from './core/bud/BudRootAI';
 import { isFirestoreConfigured } from './server/persistence/firestoreStore';
 import { repairEngine } from './core/repair-engine/repairEngine';
+import { createSkillContext, skillRegistry } from './server/bud/skills/index';
 
 function normalizeAssets(input: unknown): ProjectAsset[] {
   if (!Array.isArray(input)) return [];
@@ -85,6 +86,31 @@ export async function createApp(options: { withVite?: boolean } = {}) {
       root,
       timestamp: new Date().toISOString()
     });
+  });
+
+  app.get('/api/bud/skills', (_req, res) => {
+    res.json({ skills: skillRegistry.list().map(skill => ({
+      id: skill.id,
+      name: skill.name,
+      description: skill.description,
+      category: skill.category,
+      permissions: skill.permissions,
+      riskLevel: skill.riskLevel,
+      timeout: skill.timeout,
+      retryPolicy: skill.retryPolicy
+    })) });
+  });
+
+  app.post('/api/bud/skills/:id/execute', async (req, res) => {
+    const requestedPermissions = String(req.header('x-bud-permissions') || 'read:project').split(',').map(value => value.trim()).filter(Boolean);
+    const result = await skillRegistry.execute(req.params.id, createSkillContext({
+      projectId: typeof req.body?.projectId === 'string' ? req.body.projectId : undefined,
+      jobId: typeof req.body?.jobId === 'string' ? req.body.jobId : undefined,
+      userId: String(req.header('x-account-id') || 'anonymous'),
+      requestId: String(res.getHeader('x-request-id')),
+      permissions: requestedPermissions
+    }), req.body?.input);
+    res.status(result.success ? 200 : result.status === 'BLOCKED_SECURITY' ? 403 : 422).json(result);
   });
 
   // Visual builder: documento declarativo, preview e publicação.
