@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ImagePlus, Music2, Video, X } from 'lucide-react';
 import { ProjectAsset, ProjectAssetKind } from '../../types/engrenagem';
+import { budClient } from '../../lib/budClient';
 
 interface Props { projectId?: string; initialAssets?: ProjectAsset[]; }
 
@@ -23,9 +24,7 @@ export default function ProjectAssetLibrary({ projectId, initialAssets = [] }: P
     })));
     setBusy(true);
     try {
-      const response = await fetch(`/api/projects/${projectId}/assets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assets: next }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Falha ao enviar arquivos');
+      const data = await budClient.addAssets(projectId, next);
       setAssets(data.assets || [...assets, ...next]);
     } catch (error: any) { window.alert(error.message); }
     finally { setBusy(false); event.target.value = ''; }
@@ -33,8 +32,12 @@ export default function ProjectAssetLibrary({ projectId, initialAssets = [] }: P
 
   async function removeAsset(assetId: string) {
     if (!projectId) return;
-    const response = await fetch(`/api/projects/${projectId}/assets/${encodeURIComponent(assetId)}`, { method: 'DELETE' });
-    if (response.ok) setAssets(current => current.filter(item => item.id !== assetId));
+    try {
+      await budClient.removeAsset(projectId, assetId);
+      setAssets(current => current.filter(item => item.id !== assetId));
+    } catch {
+      window.alert('Não foi possível remover o arquivo.');
+    }
   }
 
   return <section className="border-t border-slate-800 p-3">

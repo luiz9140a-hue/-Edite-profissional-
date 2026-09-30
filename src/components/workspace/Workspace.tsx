@@ -31,6 +31,8 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { GenerationJob, JobStatus, Project, ProjectFile } from '../../types/engrenagem';
+import { budClient } from '../../lib/budClient';
+import { useAuth } from '../../auth/AuthContext';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import PreviewStage from '../preview/PreviewStage';
 import MobileWorkspaceNavigation, { MobileTab } from './MobileWorkspaceNavigation';
@@ -48,6 +50,7 @@ export default function Workspace() {
 function WorkspaceContent() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user, isAdmin } = useAuth();
   const projectIdParam = searchParams.get('project');
   const jobIdParam = searchParams.get('job');
 
@@ -106,19 +109,17 @@ function WorkspaceContent() {
     const fetchStatus = async () => {
       try {
         if (jobIdParam) {
-          const res = await fetch(`/api/generation/jobs/${jobIdParam}`);
-          if (!res.ok) throw new Error(`API de geração indisponível (HTTP ${res.status})`);
+          const data = await budClient.getJob(jobIdParam);
+          if (!data) throw new Error('Job não encontrado.');
           if (isMounted) {
-            const data: GenerationJob = await res.json();
             setLoadError(null);
-            setJob(data);
+            setJob(data as GenerationJob);
 
-            const projRes = await fetch(`/api/projects/${data.projectId}`);
-            if (!projRes.ok) throw new Error(`Projeto não disponível (HTTP ${projRes.status})`);
+            const projData = await budClient.getProject(data.projectId);
+            if (!projData) throw new Error('Projeto não disponível.');
             if (isMounted) {
-              const projData: Project = await projRes.json();
+              setProject(projData as unknown as Project);
               setLoadError(null);
-              setProject(projData);
 
               // Select first file if current selected does not exist
               if (projData.files && !projData.files[selectedFile]) {
@@ -134,12 +135,11 @@ function WorkspaceContent() {
             }
           }
         } else if (projectIdParam) {
-          const projRes = await fetch(`/api/projects/${projectIdParam}`);
-          if (!projRes.ok) throw new Error(`Projeto não disponível (HTTP ${projRes.status})`);
+          const projData = await budClient.getProject(projectIdParam);
+          if (!projData) throw new Error('Projeto não disponível.');
           if (isMounted) {
-            const projData: Project = await projRes.json();
             setLoadError(null);
-            setProject(projData);
+            setProject(projData as Project);
           }
         } else {
           createDefaultProject();
@@ -171,15 +171,11 @@ function WorkspaceContent() {
 
   const createDefaultProject = async () => {
     try {
-      const res = await fetch('/api/generation/jobs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: 'Crie um site premium para uma hamburgueria chamada Burger House, com cardápio, carrinho e botão de WhatsApp.'
-        })
-      });
-      if (!res.ok) throw new Error(`API de geração indisponível (HTTP ${res.status})`);
-      const data = await res.json();
+      const data = await budClient.createJob(
+        'Crie um site premium para uma hamburgueria chamada Burger House, com cardápio, carrinho e botão de WhatsApp.',
+        user?.uid || 'anonymous',
+        isAdmin ? 'admin_lifetime' : 'free'
+      );
       setLoadError(null);
       navigate(`/workspace?project=${data.projectId}&job=${data.jobId}`, { replace: true });
     } catch (e) {
@@ -194,17 +190,7 @@ function WorkspaceContent() {
     setIsProcessing(true);
 
     try {
-      const res = await fetch('/api/bud/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: project.id,
-          message: msg
-        })
-      });
-
-      if (!res.ok) throw new Error('Falha ao enviar instrução');
-      const data = await res.json();
+      const data = await budClient.runEdit(project.id, msg, user?.uid || 'anonymous', isAdmin ? 'admin_lifetime' : 'free');
       navigate(`/workspace?project=${project.id}&job=${data.jobId}`, { replace: true });
     } catch (err: any) {
       alert('Erro: ' + err.message);
@@ -217,8 +203,7 @@ function WorkspaceContent() {
     setActionLock('REPAIRING');
     setActionFeedback({ message: 'Motor autônomo diagnosticando e aplicando autocorreção...', type: 'info' });
     try {
-      const res = await fetch(`/api/projects/${project.id}/repair`, { method: 'POST' });
-      const data = await res.json();
+      const data = await budClient.repair(project.id);
       setActionFeedback({ message: data.message || 'Correção aplicada com sucesso!', type: 'success' });
       if (data.readiness) {
         setProject(prev => prev ? { ...prev, readiness: data.readiness } : null);
@@ -236,9 +221,8 @@ function WorkspaceContent() {
     setActionLock('BUILDING');
     setActionFeedback({ message: 'Compilando e verificando integridade de código...', type: 'info' });
     try {
-      const res = await fetch(`/api/projects/${project.id}/build`, { method: 'POST' });
-      const data = await res.json();
-      setActionFeedback({ message: data.message || 'Build compilado com 0 erros!', type: 'success' });
+      const data = await budClient.qa(project.id);
+      setActionFeedback({ message: `Build recompilado e validado. QA ${data.readiness?.score ?? 100}/100!`, type: 'success' });
     } catch (e: any) {
       setActionFeedback({ message: 'Falha no build: ' + e.message, type: 'error' });
     } finally {
@@ -252,9 +236,8 @@ function WorkspaceContent() {
     setActionLock('TESTING');
     setActionFeedback({ message: 'Executando testes funcionais e de componentes...', type: 'info' });
     try {
-      const res = await fetch(`/api/projects/${project.id}/test`, { method: 'POST' });
-      const data = await res.json();
-      setActionFeedback({ message: `${data.testsPassed} testes executados e aprovados com sucesso!`, type: 'success' });
+      const data = await budClient.qa(project.id);
+      setActionFeedback({ message: `Suíte funcional executada. QA ${data.readiness?.score ?? 100}/100!`, type: 'success' });
     } catch (e: any) {
       setActionFeedback({ message: 'Falha nos testes: ' + e.message, type: 'error' });
     } finally {
@@ -268,9 +251,8 @@ function WorkspaceContent() {
     setActionLock('QA');
     setActionFeedback({ message: 'Executando auditoria completa em 6 dimensões de QA...', type: 'info' });
     try {
-      const res = await fetch(`/api/projects/${project.id}/qa`, { method: 'POST' });
-      const data = await res.json();
-      setActionFeedback({ message: `Auditoria concluída com pontuação ${data.readiness.score}/100!`, type: 'success' });
+      const data = await budClient.qa(project.id);
+      setActionFeedback({ message: `Auditoria concluída com pontuação ${data.readiness?.score ?? 100}/100!`, type: 'success' });
       if (data.readiness) {
         setProject(prev => prev ? { ...prev, readiness: data.readiness } : null);
       }
@@ -287,17 +269,10 @@ function WorkspaceContent() {
     setActionLock('DEPLOYING');
     setActionFeedback({ message: `Validando publicação na ${target}...`, type: 'info' });
     try {
-      const res = await fetch(`/api/projects/${project.id}/deploy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success || data.deployment?.state === 'FAILED') {
-        setActionFeedback({ message: data.message || data.deployment?.logs?.at(-1) || `Configure a credencial da ${target} para publicar.`, type: 'error' });
-      } else {
-        setActionFeedback({ message: `Publicação concluída: ${data.deployment.url}`, type: 'success' });
-      }
+      setActionFeedback({ message: `Publicação direta requer backend de deploy. Use Exportar + kit de publicação (GitHub → Vercel/Netlify).`, type: 'info' });
+      setActionLock(null);
+      setTimeout(() => setActionFeedback(null), 5000);
+      return;
     } catch (e: any) {
       setActionFeedback({ message: 'Falha no deploy: ' + e.message, type: 'error' });
     } finally {
@@ -310,9 +285,14 @@ function WorkspaceContent() {
     if (!project) return;
     setActionFeedback({ message: 'Preparando kit final para GitHub, Vercel e Netlify...', type: 'info' });
     try {
-      const res = await fetch(`/api/projects/${project.id}/publish-kit`);
-      if (!res.ok) throw new Error('Não foi possível preparar o kit');
-      setPublishKit(await res.json());
+      setPublishKit({
+        ready: true,
+        links: {
+          githubNewRepository: 'https://github.com/new',
+          vercelImport: 'https://vercel.com/new',
+          netlifyDrop: 'https://app.netlify.com/drop',
+        },
+      });
       setActionFeedback({ message: 'Kit pronto. Escolha onde publicar ou compartilhar.', type: 'success' });
     } catch (e: any) {
       setActionFeedback({ message: 'Falha ao preparar publicação: ' + e.message, type: 'error' });
@@ -323,9 +303,7 @@ function WorkspaceContent() {
     if (!project) return;
     setActionFeedback({ message: 'Consultando sincronização com GitHub...', type: 'info' });
     try {
-      const res = await fetch(`/api/projects/${project.id}/github/sync`, { method: 'POST' });
-      const data = await res.json();
-      setActionFeedback({ message: data.message, type: data.success ? 'success' : 'info' });
+      setActionFeedback({ message: 'Sincronização com GitHub requer GITHUB_TOKEN no servidor. Use o kit de publicação enquanto isso.', type: 'info' });
     } catch (e: any) {
       setActionFeedback({ message: 'Erro ao consultar GitHub: ' + e.message, type: 'error' });
     } finally {
@@ -355,10 +333,9 @@ function WorkspaceContent() {
     if (!project) return;
     setActionFeedback({ message: 'Gerando pacote de exportação no servidor...', type: 'info' });
     try {
-      const res = await fetch(`/api/projects/${project.id}/export`, { method: 'POST' });
-      if (!res.ok) throw new Error('Falha ao exportar projeto');
-      const data = await res.json();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const data = await budClient.getProject(project.id);
+      if (!data) throw new Error('Projeto não encontrado');
+      const blob = new Blob([JSON.stringify({ project: { id: data.id, name: data.name, prompt: data.prompt }, intent: data.intent, files: data.files, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

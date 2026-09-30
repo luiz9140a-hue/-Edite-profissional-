@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { budClient, buildPreviewDocument } from '../../lib/budClient';
 
 export default function IsolatedPreviewPage() {
   const { id } = useParams<{ id: string }>();
@@ -9,6 +10,21 @@ export default function IsolatedPreviewPage() {
 
   useEffect(() => {
     if (!id) return;
+
+    if (budClient.mode() === 'convex') {
+      budClient
+        .getProject(id)
+        .then((project) => {
+          if (!project) throw new Error('Projeto não encontrado ou ainda não gerado.');
+          setHtmlContent(buildPreviewDocument(project as never));
+          setLoading(false);
+        })
+        .catch((err: Error) => {
+          setError(err.message);
+          setLoading(false);
+        });
+      return;
+    }
 
     fetch(`/api/projects/${id}/preview-html`)
       .then(res => {

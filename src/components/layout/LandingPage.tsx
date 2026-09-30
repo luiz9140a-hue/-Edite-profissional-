@@ -18,6 +18,7 @@ import {
   X
 } from 'lucide-react';
 import { ProjectAsset, ProjectAssetKind } from '../../types/engrenagem';
+import { budClient } from '../../lib/budClient';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -45,19 +46,9 @@ export default function LandingPage() {
   };
 
   const createJob = async (textToRun: string) => {
-    const res = await fetch('/api/generation/jobs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-account-id': user?.uid || 'anonymous', 'x-plan-id': isAdmin ? 'admin_lifetime' : 'free' },
-      body: JSON.stringify({ prompt: textToRun, assets: uploadedAssets })
-    });
+    const data = await budClient.createJob(textToRun, user?.uid || 'anonymous', isAdmin ? 'admin_lifetime' : 'free', uploadedAssets);
 
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || 'Falha ao iniciar geração');
-    }
-
-    const data = await res.json();
-    window.sessionStorage.setItem('bud-last-result', JSON.stringify({ job: data, project: data.project }));
+    window.sessionStorage.setItem('bud-last-result', JSON.stringify({ job: data, project: (data as { project?: unknown }).project }));
     setActiveJobStatus('Analisando intenção e arquitetura...');
     setTimeout(() => navigate(`/workspace?project=${data.projectId}&job=${data.jobId}`), 700);
   };
@@ -76,13 +67,7 @@ export default function LandingPage() {
     try {
       const looksLikeSaaS = /\b(saas|software|plataforma|sistema)\b/i.test(textToRun) || intakeMessages.length > 0;
       if (looksLikeSaaS) {
-        const res = await fetch('/api/bud/intake', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: textToRun, history: intakeMessages })
-        });
-        if (!res.ok) throw new Error('Falha ao conversar com o BUD');
-        const data = await res.json();
+        const data = await budClient.intake(textToRun, intakeMessages.length + 1, `session-${user?.uid || 'anon'}`);
         setIntakeMessages(prev => [...prev, { role: 'user', content: textToRun }, { role: 'assistant', content: data.message }]);
         setPrompt('');
         if (data.status === 'QUESTION') {
