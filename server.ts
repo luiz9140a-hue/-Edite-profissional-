@@ -1,6 +1,5 @@
 import express from 'express';
 import { createServer } from 'vite';
-import path from 'node:path';
 import { jobEngine } from './core/bud/JobEngine';
 import { providerRouter } from './core/provider-router/providerRouter';
 import { toolRegistry } from './core/tool-registry/toolRegistry';
@@ -582,27 +581,20 @@ export async function createApp(options: { withVite?: boolean } = {}) {
     res.json(report);
   });
 
-  // Vite is mounted only for local development. Render serves the built SPA directly.
+  // Vite is mounted only for local development. Vercel uses api/index.ts.
   if (options.withVite) {
     const vite = await createServer({
       server: { middlewareMode: true },
       appType: 'spa'
     });
     app.use(vite.middlewares);
-  } else {
-    const distDir = path.resolve(process.cwd(), 'dist');
-    app.use(express.static(distDir));
-    app.get('*', (req, res, next) => {
-      if (req.path.startsWith('/api/')) return next();
-      res.sendFile(path.join(distDir, 'index.html'));
-    });
   }
 
   return app;
 }
 
 async function startServer() {
-  const app = await createApp({ withVite: process.env.NODE_ENV !== 'production' });
+  const app = await createApp({ withVite: true });
   const port = Number(process.env.PORT || 3000);
   app.listen(port, () => {
     console.log(`Engrenagem AI Dev Server operacional na porta ${port}`);
