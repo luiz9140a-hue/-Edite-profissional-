@@ -20,6 +20,9 @@ import { applyOperation, type VisualOperation } from './core/visual-builder/oper
 import { listRegisteredComponents } from './core/visual-builder/componentRegistry';
 import { checkPlatformHealth, getLastSync, syncDocument } from './core/platform-bridge/bridge';
 import { allowRequest, requestId } from './core/platform-bridge/traffic';
+import { budRootAI } from './core/bud/BudRootAI';
+import { isFirestoreConfigured } from './server/persistence/firestoreStore';
+import { repairEngine } from './core/repair-engine/repairEngine';
 
 function normalizeAssets(input: unknown): ProjectAsset[] {
   if (!Array.isArray(input)) return [];
@@ -52,6 +55,34 @@ export async function createApp(options: { withVite?: boolean } = {}) {
       status: 'ok',
       service: 'edite-profissional',
       runtime: process.env.VERCEL ? 'vercel' : 'local',
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  app.get('/api/bud/health', (_req, res) => {
+    const root = budRootAI.health();
+    const providerStatus = (id: string) => {
+      const status = providerRouter.getStatus(id);
+      return status === 'AVAILABLE' ? 'READY' : status === 'ERROR' || status === 'RATE_LIMITED' ? 'ERROR' : 'BLOCKED';
+    };
+    const checks = {
+      bud: root.bud,
+      gemini: root.runtime.configured ? 'READY' : 'BLOCKED',
+      supervisor: root.supervisor,
+      projectBrain: root.projectBrain,
+      toolRegistry: root.toolRegistry,
+      jobEngine: typeof jobEngine.listJobs === 'function' ? 'READY' : 'BLOCKED',
+      qa: typeof runComprehensiveQA === 'function' ? 'READY' : 'BLOCKED',
+      repair: typeof repairEngine.diagnoseAndRepair === 'function' ? 'READY' : 'BLOCKED',
+      firebase: isFirestoreConfigured() ? 'READY' : 'BLOCKED',
+      github: providerStatus('github'),
+      vercel: providerStatus('vercel')
+    } as const;
+    const ready = Object.values(checks).every(status => status === 'READY');
+    res.status(ready ? 200 : 503).json({
+      status: ready ? 'READY' : 'BLOCKED',
+      checks,
+      root,
       timestamp: new Date().toISOString()
     });
   });
@@ -201,7 +232,7 @@ export async function createApp(options: { withVite?: boolean } = {}) {
   });
 
   // 5. BUD Chat / Command execution on existing project
-  app.post('/api/bud/run', (req, res) => {
+  app.post('/api/bud/run', async (req, res) => {
     try {
       const { projectId, message } = req.body;
       if (!projectId || !message) {
@@ -218,11 +249,33 @@ export async function createApp(options: { withVite?: boolean } = {}) {
       const reservation = reserveApiCredits(uid, planId, 'bud_generation', 1);
       if (!reservation.allowed) return res.status(429).json({ error: 'Créditos diários insuficientes para editar este projeto.', usage: getApiUsage(uid, planId) });
 
-      const job = jobEngine.runEdit(projectId, message);
+      const orchestration = await budRootAI.run({
+        userRequest: message,
+        mode: 'EDIT',
+        projectId,
+        projectContext: project.brain,
+        currentFiles: project.files,
+        currentState: project.status,
+        acceptanceCriteria: ['job criado', 'pipeline de execução iniciado', 'resultado observável']
+      }, () => jobEngine.runEdit(projectId, message));
+      if (orchestration.state !== 'READY' || !orchestration.result) {
+        return res.status(orchestration.state === 'BLOCKED_EXTERNAL' ? 503 : 500).json({
+          error: orchestration.error || 'ROOT AI não concluiu a orquestração.',
+          state: orchestration.state,
+          evidence: orchestration.evidence
+        });
+      }
+      const job = orchestration.result;
       res.json({
         jobId: job.id,
         projectId,
-        status: job.status
+        status: job.status,
+        rootAI: {
+          state: orchestration.state,
+          phase: orchestration.phase,
+          evidence: orchestration.evidence,
+          decision: orchestration.decision
+        }
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message || 'Erro ao processar comando com BUD.' });

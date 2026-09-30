@@ -480,6 +480,12 @@ export class JobEngine {
       eventEngine.emit(projectId, jobId, 'PROJECT_READY', { projectId });
       addLog('success', `[JobEngine] Pipeline finalizado com pontuação ${finalReadiness.score}/100.`, 'READY');
 
+      project.brain = ProjectBrainManager.updateBrain(project.brain, {
+        currentIntent: intent,
+        files: project.files,
+        dependencies: plan.dependencies
+      });
+      project.brain = ProjectBrainManager.checkpoint(project.brain, finalReadiness.ready ? 'VERIFIED' : 'BLOCKED', `QA final ${finalReadiness.score}/100`);
       project.brain.history.push({
         id: 'hist-' + Date.now(),
         prompt,
