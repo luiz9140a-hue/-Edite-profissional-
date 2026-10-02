@@ -3,15 +3,28 @@ import type { SkillDefinition } from './SkillTypes.ts';
 import type { SkillResult } from './SkillResult.ts';
 import { hasPermission } from './SkillSecurity.ts';
 
+const emptyResult = <T>(skill: SkillDefinition<any, T>, context: SkillContext, status: SkillResult<T>['status'], error: string, nextAction: string): SkillResult<T> => ({
+  success: false,
+  status,
+  skillId: skill.id,
+  jobId: context.jobId,
+  projectId: context.projectId,
+  filesChanged: [],
+  commandsExecuted: [],
+  artifactsCreated: [],
+  testsExecuted: [],
+  errors: [error],
+  warnings: [],
+  evidence: [],
+  nextAction,
+  timestamp: new Date().toISOString()
+});
+
 export class SkillExecutor {
   public async execute<TInput, TOutput>(skill: SkillDefinition<TInput, TOutput>, context: SkillContext, input: unknown): Promise<SkillResult<TOutput>> {
-    if (!skill.validate(input)) {
-      return { success: false, status: 'INVALID', skillId: skill.id, jobId: context.jobId, projectId: context.projectId, filesChanged: [], commandsExecuted: [], artifactsCreated: [], testsExecuted: [], errors: ['Input não atende ao schema da skill.'], warnings: [], evidence: [], nextAction: 'REPAIR_INPUT', timestamp: new Date().toISOString() };
-    }
+    if (!skill.validate(input)) return emptyResult(skill, context, 'INVALID', 'Input não atende ao schema da skill.', 'REPAIR_INPUT');
     for (const permission of skill.permissions) {
-      if (!hasPermission(context.permissions, permission)) {
-        return { success: false, status: 'BLOCKED_SECURITY', skillId: skill.id, jobId: context.jobId, projectId: context.projectId, filesChanged: [], commandsExecuted: [], artifactsCreated: [], testsExecuted: [], errors: [`Permissão ausente: ${permission}`], warnings: [], evidence: [], nextAction: 'REQUEST_PERMISSION', timestamp: new Date().toISOString() };
-      }
+      if (!hasPermission(context.permissions, permission)) return emptyResult(skill, context, 'BLOCKED_SECURITY', `Permissão ausente: ${permission}`, 'REQUEST_PERMISSION');
     }
 
     let last: SkillResult<TOutput> | undefined;
@@ -27,10 +40,10 @@ export class SkillExecutor {
         }
         if (last.success || attempt === attempts) return last;
       } catch (error) {
-        last = { success: false, status: 'FAILED', skillId: skill.id, jobId: context.jobId, projectId: context.projectId, filesChanged: [], commandsExecuted: [], artifactsCreated: [], testsExecuted: [], errors: [error instanceof Error ? error.message : String(error)], warnings: [], evidence: [], nextAction: attempt < attempts ? 'RETRY' : 'REPAIR_OR_BLOCK', timestamp: new Date().toISOString() };
+        last = emptyResult(skill, context, 'FAILED', error instanceof Error ? error.message : String(error), attempt < attempts ? 'RETRY' : 'REPAIR_OR_BLOCK');
       }
       if (attempt < attempts) await new Promise(resolve => setTimeout(resolve, skill.retryPolicy.backoffMs * attempt));
     }
-    return last!;
+    return last || emptyResult(skill, context, 'FAILED', 'Skill não produziu resultado.', 'REPAIR_OR_BLOCK');
   }
 }
