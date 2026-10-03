@@ -1,7 +1,7 @@
-export type DeploymentState = 'QUEUED' | 'BUILDING' | 'DEPLOYING' | 'DEPLOYED' | 'FAILED';
+export type DeploymentState = 'QUEUED' | 'BUILDING' | 'DEPLOYING' | 'DEPLOYED' | 'FAILED' | 'BLOCKED_EXTERNAL';
 
 export interface DeploymentStatus {
-  id: string;
+  id?: string;
   projectId: string;
   target: 'cloud_run' | 'vercel' | 'netlify' | 'docker';
   state: DeploymentState;
@@ -9,34 +9,33 @@ export interface DeploymentStatus {
   startedAt: string;
   completedAt?: string;
   logs: string[];
+  errorCode?: string;
+  errorMessage?: string;
 }
 
 export class DeploymentProvider {
   private deployments: Map<string, DeploymentStatus> = new Map();
 
   public async triggerDeployment(projectId: string, target: 'cloud_run' | 'vercel' | 'netlify' | 'docker' = 'cloud_run'): Promise<DeploymentStatus> {
-    const deploymentId = 'dep-' + Math.random().toString(36).substring(2, 9);
     const now = new Date().toISOString();
-
     const tokenName = target === 'vercel' ? 'VERCEL_TOKEN' : target === 'netlify' ? 'NETLIFY_AUTH_TOKEN' : undefined;
     const configured = !tokenName || Boolean(process.env[tokenName]);
-    const adapterImplemented = false;
-    const canDeploy = configured && adapterImplemented;
     const deployment: DeploymentStatus = {
-      id: deploymentId,
       projectId,
       target,
-      state: canDeploy ? 'DEPLOYED' : 'FAILED',
-      url: undefined,
+      state: 'BLOCKED_EXTERNAL',
       startedAt: now,
       completedAt: now,
+      errorCode: configured ? 'DEPLOYMENT_ADAPTER_NOT_IMPLEMENTED' : 'DEPLOYMENT_AUTH_MISSING',
+      errorMessage: configured
+        ? `Não existe adapter real conectado para ${target}; nenhum deployment foi criado.`
+        : `Credencial ${tokenName} ausente; nenhum deployment foi criado.`,
       logs: [
-        `[DeploymentEngine] Kit de publicação preparado para ${target}.`,
-        !configured ? `[DeploymentEngine] Credencial ${tokenName} ausente; nenhum deploy externo foi executado.` : `[DeploymentEngine] Credencial ${tokenName || 'do ambiente'} encontrada, mas o adaptador de deploy ainda não está implementado; nenhum deploy externo foi executado.`,
-        canDeploy ? '[DeploymentEngine] Deploy confirmado pelo provedor.' : '[DeploymentEngine] Nenhuma URL foi atribuída porque não existe confirmação real do provedor.'
+        `[DeploymentEngine] Solicitação ${target} bloqueada sem confirmação do provedor.`,
+        configured ? '[DeploymentEngine] Adapter real ausente.' : `[DeploymentEngine] Credencial ${tokenName} ausente.`,
+        '[DeploymentEngine] Nenhum deploymentId ou URL foi atribuído.'
       ]
     };
-
     this.deployments.set(projectId, deployment);
     return deployment;
   }

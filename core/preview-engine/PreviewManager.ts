@@ -2,6 +2,24 @@ import { eventEngine } from '../event-engine/eventEngine.ts';
 
 export type PreviewStatus = 'STOPPED' | 'STARTING' | 'RUNNING' | 'RESTARTING' | 'CRASHED' | 'ERROR';
 
+export interface PreviewEvidence {
+  type: string;
+  message: string;
+  data?: unknown;
+}
+
+export interface PreviewResult {
+  success: boolean;
+  mode: 'LOCAL';
+  projectId: string;
+  url?: string;
+  statusCode?: number;
+  readyState?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  evidence: PreviewEvidence[];
+}
+
 export interface PreviewInstance {
   projectId: string;
   status: PreviewStatus;
@@ -55,6 +73,25 @@ export class PreviewManager {
 
   public getUrl(projectId: string): string {
     return `/api/projects/${projectId}/preview-html?t=${Date.now()}`;
+  }
+
+  public getResult(projectId: string): PreviewResult {
+    const instance = this.getOrCreateInstance(projectId);
+    const success = instance.health === 'ONLINE' && instance.status === 'RUNNING';
+    return {
+      success,
+      mode: 'LOCAL',
+      projectId,
+      url: success ? `/preview/${encodeURIComponent(projectId)}` : undefined,
+      readyState: success ? 'LOCAL_READY' : instance.status,
+      errorCode: success ? undefined : 'LOCAL_PREVIEW_UNAVAILABLE',
+      errorMessage: success ? undefined : instance.error?.message || 'Preview local indisponível.',
+      evidence: [{
+        type: 'LOCAL_PREVIEW',
+        message: success ? 'Preview local registrado pelo servidor.' : 'Preview local não está online.',
+        data: { status: instance.status, health: instance.health, restartsCount: instance.restartsCount }
+      }]
+    };
   }
 
   public getLogs(projectId: string) {

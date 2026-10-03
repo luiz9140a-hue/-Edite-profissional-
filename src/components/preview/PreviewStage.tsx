@@ -38,6 +38,7 @@ export default function PreviewStage({
   const [phonePreset, setPhonePreset] = useState<PhonePreset>('390');
   const [orientation, setOrientation] = useState<Orientation>('portrait');
   const [previewHealth, setPreviewHealth] = useState<'ONLINE' | 'OFFLINE' | 'CRASHED' | 'CHECKING'>('CHECKING');
+  const [previewFailure, setPreviewFailure] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState<number>(Date.now());
   const [restartsCount, setRestartsCount] = useState<number>(0);
   const [runtimeError, setRuntimeError] = useState<{
@@ -83,15 +84,20 @@ export default function PreviewStage({
 
     const runHealthCheck = async () => {
       try {
-        const res = await fetch(`/api/projects/${project.id}/preview/health`);
-        if (res.ok && isMounted) {
-          const data = await res.json();
-          setPreviewHealth(data.health === 'ONLINE' ? 'ONLINE' : 'OFFLINE');
+        const res = await fetch(`/api/projects/${project.id}/preview/result`);
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success && isMounted) {
+          setPreviewFailure(null);
+          setPreviewHealth('ONLINE');
         } else if (isMounted) {
+          setPreviewFailure(data.errorMessage || 'Preview indisponível; nenhum deployment válido foi confirmado.');
           setPreviewHealth('OFFLINE');
         }
       } catch (err) {
-        if (isMounted) setPreviewHealth('OFFLINE');
+        if (isMounted) {
+          setPreviewFailure('Não foi possível verificar o resultado real do preview.');
+          setPreviewHealth('OFFLINE');
+        }
       }
     };
 
@@ -256,6 +262,12 @@ export default function PreviewStage({
               )}
             </div>
           </div>
+        ) : previewFailure ? (
+          <div className="w-full max-w-lg bg-slate-950 border border-amber-500/30 rounded-2xl p-6 flex flex-col items-center justify-center text-center shadow-2xl">
+            <AlertTriangle className="w-7 h-7 text-amber-400 mb-3" />
+            <h3 className="text-xl font-black text-white mb-2">Preview indisponível</h3>
+            <p className="text-slate-400 text-xs max-w-md leading-relaxed">{previewFailure}</p>
+          </div>
         ) : isMobileHost ? (
           /* Mobile Host: Direct Fullscreen Preview with no outer frame */
           <div className="w-full h-full bg-black rounded-xl overflow-hidden border border-slate-850 flex flex-col">
@@ -337,7 +349,7 @@ export default function PreviewStage({
                 <span className="w-2 h-2 rounded-full bg-emerald-500/80"></span>
               </div>
               <span className="font-mono text-slate-400 truncate max-w-[280px]">
-                https://sandbox.engrenagem.ai/preview/{project.id}
+                Preview local • /preview/{project.id}
               </span>
               <div className="flex items-center space-x-1 font-mono text-[10px] text-emerald-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>

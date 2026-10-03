@@ -365,6 +365,7 @@ export async function createApp(options: { withVite?: boolean } = {}) {
 
   // 8. Direct Preview HTML stream for isolated iframe
   app.get('/api/projects/:id/preview-html', (req, res) => {
+    if (!jobEngine.getProject(req.params.id)) return res.status(404).json({ error: 'Projeto não encontrado; preview não existe.' });
     const html = jobEngine.getPreviewHtml(req.params.id);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
@@ -372,6 +373,7 @@ export async function createApp(options: { withVite?: boolean } = {}) {
 
   // 8a. Standalone preview endpoint for new tabs (/preview/:id)
   app.get('/preview/:id', (req, res) => {
+    if (!jobEngine.getProject(req.params.id)) return res.status(404).send('Preview não encontrado.');
     const html = jobEngine.getPreviewHtml(req.params.id);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
@@ -381,6 +383,14 @@ export async function createApp(options: { withVite?: boolean } = {}) {
   app.get('/api/projects/:id/preview/health', async (req, res) => {
     const health = await previewManager.checkHealth(req.params.id);
     res.json(health);
+  });
+
+  // 8b. Resultado verificável do preview local; não é deployment Vercel.
+  app.get('/api/projects/:id/preview/result', async (req, res) => {
+    if (!jobEngine.getProject(req.params.id)) return res.status(404).json({ success: false, mode: 'LOCAL', projectId: req.params.id, errorCode: 'PROJECT_NOT_FOUND', errorMessage: 'Projeto não encontrado; preview não existe.', evidence: [] });
+    await previewManager.checkHealth(req.params.id);
+    const result = previewManager.getResult(req.params.id);
+    res.status(result.success ? 200 : 503).json(result);
   });
 
   // 8c. Preview Restart
