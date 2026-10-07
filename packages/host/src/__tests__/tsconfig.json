@@ -1,9 +1,0 @@
-{
-  "extends": "../../tsconfig.json",
-  "compilerOptions": {
-    "noUnusedLocals": false,
-    "noUnusedParameters": false
-  },
-  "include": ["**/*.spec-d.ts"],
-  "exclude": ["../../src/**/*.spec.ts"]
-}

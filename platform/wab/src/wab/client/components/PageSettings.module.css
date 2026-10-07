@@ -1,7 +1,0 @@
-.pageSettingsContainer [class*="labelContainer"] {
-  width: 100px;
-}
-
-.pageSettingsContainer [data-plasmic-role="labeled-item"] {
-  column-gap: 8px;
-}
