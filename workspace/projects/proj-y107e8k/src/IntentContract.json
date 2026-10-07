@@ -1,0 +1,39 @@
+{
+  "projectType": "website",
+  "businessType": "negocio_geral",
+  "businessName": "Minha Empresa",
+  "domain": "general",
+  "targetAudience": "Clientes exigentes e usuários digitais",
+  "primaryGoal": "Converter visitantes em clientes e otimizar operações",
+  "requiredFeatures": [
+    "Seção Hero de Alto Impacto",
+    "Apresentação de Serviços",
+    "Formulário de Contato",
+    "Rodapé Institucional"
+  ],
+  "visualConcepts": [
+    "moderno",
+    "responsivo",
+    "elegante",
+    "alta conversão"
+  ],
+  "requiredAssets": [
+    "hero_banner",
+    "services_icons",
+    "about_photo"
+  ],
+  "forbiddenAssets": [
+    "low_quality",
+    "broken_links"
+  ],
+  "colorPalette": {
+    "primary": "#2563EB",
+    "secondary": "#1E293B",
+    "accent": "#38BDF8",
+    "background": "#0B0F19",
+    "text": "#F8FAFC"
+  },
+  "responsiveRequired": true,
+  "mobileRequired": true,
+  "desktopRequired": true
+}

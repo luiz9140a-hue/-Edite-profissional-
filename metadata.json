@@ -1,0 +1,6 @@
+{
+  "name": "Engrenagem AI",
+  "description": "Plataforma de criação de software por linguagem natural.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

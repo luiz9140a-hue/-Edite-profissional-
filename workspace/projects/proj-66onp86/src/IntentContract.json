@@ -1,0 +1,48 @@
+{
+  "projectType": "saas",
+  "businessType": "clinica_odontologica",
+  "businessName": "DentalCare Pro",
+  "domain": "healthcare",
+  "targetAudience": "Clientes exigentes e usuários digitais",
+  "primaryGoal": "Converter visitantes em clientes e otimizar operações",
+  "requiredFeatures": [
+    "Painel de Gestão e Dashboard Clínico",
+    "Cadastro e Lista de Pacientes",
+    "Agenda de Consultas e Procedimentos",
+    "Prontuário Odontológico Digital",
+    "Histórico de Tratamentos e Orçamentos"
+  ],
+  "visualConcepts": [
+    "saúde",
+    "confiança",
+    "limpo",
+    "tecnológico",
+    "sorrisos saudáveis"
+  ],
+  "requiredAssets": [
+    "dentist_doctor",
+    "patient_smile",
+    "dental_clinic",
+    "medical_equipment",
+    "clean_dashboard"
+  ],
+  "forbiddenAssets": [
+    "alcohol",
+    "beer",
+    "wine",
+    "fast_food",
+    "burger",
+    "barbecue",
+    "nightclub"
+  ],
+  "colorPalette": {
+    "primary": "#0EA5E9",
+    "secondary": "#0F172A",
+    "accent": "#14B8A6",
+    "background": "#04101E",
+    "text": "#F0F9FF"
+  },
+  "responsiveRequired": true,
+  "mobileRequired": true,
+  "desktopRequired": true
+}

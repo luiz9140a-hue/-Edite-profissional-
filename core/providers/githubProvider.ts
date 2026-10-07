@@ -1,0 +1,60 @@
+export interface GitHubStatus {
+  status: 'NOT_CONFIGURED' | 'CONNECTED' | 'SYNCED';
+  repository?: string;
+  branch: string;
+  lastCommit?: string;
+  setupInstructions?: string;
+}
+
+export class GitHubProvider {
+  private isConfigured: boolean = false;
+  private repoName?: string;
+
+  constructor() {
+    this.isConfigured = !!process.env.GITHUB_TOKEN;
+  }
+
+  public getStatus(projectName: string): GitHubStatus {
+    if (!this.isConfigured) {
+      return {
+        status: 'NOT_CONFIGURED',
+        branch: 'main',
+        setupInstructions: 'Defina a variável de ambiente GITHUB_TOKEN para sincronizar repositórios privados ou públicos automaticamente.'
+      };
+    }
+
+    return {
+      status: 'CONNECTED',
+      branch: 'main',
+      setupInstructions: 'Credencial detectada, mas nenhum repositório foi sincronizado nesta instância.'
+    };
+  }
+
+  public async syncRepository(projectName: string) {
+    if (!this.isConfigured) {
+      return {
+        success: false,
+        status: 'NOT_CONFIGURED',
+        message: 'GitHub não configurado. Para conectar, configure seu Personal Access Token.'
+      };
+    }
+
+    return {
+      success: false,
+      status: 'CONNECTED',
+      message: `Token do GitHub detectado, mas a sincronização de ${projectName} não foi executada: o adaptador de API/commit ainda não está implementado.`
+    };
+  }
+
+  public getShareLinks(projectName: string) {
+    const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'bud-project';
+    return {
+      repositoryName: slug,
+      createRepository: `https://github.com/new?name=${encodeURIComponent(slug)}`,
+      vercelImport: `https://vercel.com/new/clone?repository-name=${encodeURIComponent(slug)}`,
+      netlifyDrop: 'https://app.netlify.com/drop'
+    };
+  }
+}
+
+export const githubProvider = new GitHubProvider();
