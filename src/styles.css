@@ -116,4 +116,9 @@ button{cursor:pointer}
   .left,.right{display:none}
   .workgrid{grid-template-columns:1fr}
   .preview{border-top:1px solid var(--border);min-height:480px}
+  .composer textarea{font-size:16px;min-height:60px}
+  .topbar{padding:0 10px}
+  .bottom-content{grid-template-columns:1fr}
+  .checkpoints{display:none}
+  .preview-frame{max-width:100% !important;height:calc(100vh - 220px)}
 }
