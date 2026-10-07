@@ -1,50 +1,56 @@
 import { useState } from 'react';
-import { applyAction, parseIntent } from '../lib/bud';
+import { callBud, BudMessage } from '../lib/bud';
 
 type Message = { role: 'user' | 'bud'; text: string };
 
 export default function BudChat({
   html,
   setHtml,
-  onRunQa,
-  onRunBuild,
   onLog,
 }: {
   html: string;
   setHtml: (h: string) => void;
-  onRunQa: () => void;
-  onRunBuild: () => void;
   onLog: (msg: string, kind?: 'ok' | 'warn' | 'err') => void;
 }) {
   const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'bud',
-      text: 'Pronto. Peça alterações reais: <i>troque o título do hero para "..."</i>, <i>mude a cor da CTA para verde</i>, <i>rode qa</i>, <i>rode build</i>.',
+      text: 'Olá! Sou o BUD. Digite o que você quer criar. Exemplo: <i>"Quero um SaaS para barbearia com página de agendamento"</i> e eu gero o site completo.',
     },
   ]);
 
-  function send() {
+  async function send() {
     const text = input.trim();
-    if (!text) return;
-    setMessages((m) => [...m, { role: 'user', text }]);
-    const action = parseIntent(text);
+    if (!text || loading) return;
 
-    if (action.kind === 'run-qa') {
-      onRunQa();
-      setMessages((m) => [...m, { role: 'bud', text: 'QA executado. Veja o painel inferior.' }]);
-    } else if (action.kind === 'run-build') {
-      onRunBuild();
-      setMessages((m) => [...m, { role: 'bud', text: 'Build executado. Veja o painel inferior.' }]);
-    } else {
-      const r = applyAction(html, action);
-      if (r.changed) {
-        setHtml(r.html);
-        onLog(`patch aplicado: ${action.kind}`, 'ok');
-      }
-      setMessages((m) => [...m, { role: 'bud', text: r.message }]);
-    }
+    setMessages((m) => [...m, { role: 'user', text }]);
     setInput('');
+    setLoading(true);
+    onLog('bud.request · enviando para Gemini', 'ok');
+
+    const history: BudMessage[] = messages.map((m) => ({
+      role: m.role,
+      content: m.text,
+    }));
+    history.push({ role: 'user', content: text });
+
+    const { html: newHtml, error } = await callBud(history, html);
+
+    setLoading(false);
+
+    if (error) {
+      setMessages((m) => [...m, { role: 'bud', text: `Erro: ${error}` }]);
+      onLog(`bud.error · ${error}`, 'err');
+      return;
+    }
+
+    if (newHtml) {
+      setHtml(newHtml);
+      setMessages((m) => [...m, { role: 'bud', text: 'Pronto! Site gerado. Veja o preview ao lado.' }]);
+      onLog('bud.success · site gerado', 'ok');
+    }
   }
 
   return (
@@ -65,6 +71,7 @@ export default function BudChat({
         {messages.map((m, i) => (
           <div key={i} className={'msg ' + m.role} dangerouslySetInnerHTML={{ __html: m.text }} />
         ))}
+        {loading && <div className="msg bud"><i>Gerando com Gemini…</i></div>}
       </div>
       <div className="composer">
         <div className="composerbox">
@@ -77,15 +84,17 @@ export default function BudChat({
                 send();
               }
             }}
-            placeholder="Peça uma alteração ao BUD..."
+            placeholder="Ex: Quero um SaaS para barbearia..."
+            disabled={loading}
           />
           <div className="compose-footer">
             <span className="hint">Enter envia · Shift+Enter nova linha</span>
-            <button className="send" onClick={send}>➤</button>
+            <button className="send" onClick={send} disabled={loading}>
+              {loading ? '…' : '➤'}
+            </button>
           </div>
         </div>
       </div>
     </aside>
   );
 }
-
