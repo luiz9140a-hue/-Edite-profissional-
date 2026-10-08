@@ -55,31 +55,48 @@ export default function PreviewStage({
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const isConvexMode = budClient.mode() === 'convex';
+  const isEmbeddedMode = budClient.mode() === 'embedded';
 
   // Build the preview document (Convex mode renders locally from project files)
   useEffect(() => {
     let isMounted = true;
-    if (isConvexMode) {
+    if (isConvexMode || isEmbeddedMode) {
       budClient
         .getProject(project.id)
         .then((projectData) => {
           if (isMounted && projectData) {
-            setSrcDoc(buildPreviewDocument(projectData as never));
-            setPreviewHealth('ONLINE');
+            const html = projectData.files?.['index.html']?.content?.trim();
+            if (html) {
+              setSrcDoc(buildPreviewDocument(projectData as never));
+              setPreviewFailure(null);
+              setPreviewHealth('ONLINE');
+            } else {
+              setSrcDoc('');
+              setPreviewFailure('Preview indisponível; nenhum HTML foi encontrado.');
+              setPreviewHealth('OFFLINE');
+            }
+          } else if (isMounted) {
+            setSrcDoc('');
+            setPreviewFailure('Preview indisponível; nenhum HTML foi encontrado.');
+            setPreviewHealth('OFFLINE');
           }
         })
         .catch(() => {
-          if (isMounted) setPreviewHealth('OFFLINE');
+          if (isMounted) {
+            setSrcDoc('');
+            setPreviewFailure('Preview indisponível; nenhum HTML foi encontrado.');
+            setPreviewHealth('OFFLINE');
+          }
         });
     }
     return () => {
       isMounted = false;
     };
-  }, [project.id, project.updatedAt, previewKey, isConvexMode]);
+  }, [project.id, project.updatedAt, previewKey, isConvexMode, isEmbeddedMode]);
 
   // Health check on project mount or key change (REST mode only)
   useEffect(() => {
-    if (isConvexMode) return;
+    if (isConvexMode || isEmbeddedMode) return;
     let isMounted = true;
 
     const runHealthCheck = async () => {
@@ -108,7 +125,7 @@ export default function PreviewStage({
       isMounted = false;
       clearInterval(interval);
     };
-  }, [project.id, previewKey, isConvexMode]);
+  }, [project.id, previewKey, isConvexMode, isEmbeddedMode]);
 
   // Listen to message events from iframe
   useEffect(() => {
@@ -134,7 +151,7 @@ export default function PreviewStage({
   const handleManualRestart = async () => {
     setIsRestarting(true);
     try {
-      if (!isConvexMode) {
+      if (!isConvexMode && !isEmbeddedMode) {
         const res = await fetch(`/api/projects/${project.id}/preview/restart`, { method: 'POST' });
         const data = await res.json();
         setRestartsCount(data.restartsCount || restartsCount + 1);
@@ -152,7 +169,7 @@ export default function PreviewStage({
   };
 
   const handleOpenNewTab = () => {
-    if (isConvexMode) {
+    if (isConvexMode || isEmbeddedMode) {
       const win = window.open('', '_blank');
       if (win) {
         win.document.open();
@@ -178,7 +195,7 @@ export default function PreviewStage({
   // Compute dimensions based on device mode
   const currentPhoneDim = PHONE_PRESETS[phonePreset][orientation];
 
-  const iframeProps = isConvexMode
+  const iframeProps = isConvexMode || isEmbeddedMode
     ? { srcDoc: srcDoc || '<!doctype html><html><body style="background:#0A0D14"></body></html>' }
     : { src: `/api/projects/${project.id}/preview-html?t=${previewKey}` };
 
