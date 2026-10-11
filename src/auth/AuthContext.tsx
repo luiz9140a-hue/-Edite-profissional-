@@ -95,7 +95,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const persistAfterAuth = async (firebaseUser: User) => {
-    await ensureProfile(firebaseUser);
+    try {
+      await ensureProfile(firebaseUser);
+    } catch (err) {
+      console.warn('[auth] falha ao salvar perfil no Firestore:', err);
+    }
     setUser(mapUser(firebaseUser));
   };
 
