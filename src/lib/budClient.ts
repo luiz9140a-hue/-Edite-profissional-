@@ -135,7 +135,7 @@ export const budClient = {
       return convex().mutation(api.projects.createProject, { prompt, accountId, planId });
     }
     if (mode === 'embedded') {
-      const result = embeddedCreateProject(prompt, accountId, planId);
+      const result = await embeddedCreateProject(prompt, accountId, planId);
       return { ...result, project: embeddedGetProject(result.projectId) };
     }
     return rest<CreateJobResult>('/api/generation/jobs', {

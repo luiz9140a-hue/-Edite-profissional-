@@ -63,7 +63,8 @@ export type GenResult =
 
 export async function generateSiteWithAI(
   prompt: string,
-  currentHtml?: string
+  currentHtml?: string,
+  options?: { signal?: AbortSignal }
 ): Promise<GenResult> {
   try {
     if (!apiKey) {
@@ -76,7 +77,7 @@ export async function generateSiteWithAI(
       ? `Altere o site abaixo conforme pedido:\n\nPEDIDO: ${prompt}\n\nHTML ATUAL:\n${currentHtml}`
       : `Crie um site completo conforme pedido:\n\n${prompt}`;
 
-    const response = await ai.models.generateContent({
+    const request = ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: userMessage,
       config: {
@@ -85,6 +86,19 @@ export async function generateSiteWithAI(
         maxOutputTokens: 30000,
       },
     });
+    const response = options?.signal
+      ? await Promise.race([
+          request,
+          new Promise<never>((_, reject) => {
+            const signal = options.signal;
+            if (signal?.aborted) {
+              reject(new Error('Geração cancelada.'));
+              return;
+            }
+            signal?.addEventListener('abort', () => reject(new Error('Geração cancelada.')), { once: true });
+          }),
+        ])
+      : await request;
 
     let html = response.text || '';
     html = html.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();

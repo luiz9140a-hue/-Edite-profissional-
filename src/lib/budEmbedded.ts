@@ -1,4 +1,6 @@
 import type { GenerationJob, LogEntry, Project } from '../types/engrenagem';
+import type { ProjectFile } from '../types/engrenagem';
+import { generateSiteWithAI } from './aiGenerator';
 import {
   classifyIntent,
   generateProjectFiles,
@@ -84,6 +86,20 @@ function consume(accountId: string, cost: number): void {
   persist();
 }
 
+function isValidHtml(html: string): boolean {
+  if (!html) return false;
+  const lower = html.toLowerCase();
+  if (!lower.startsWith('<!doctype')) return false;
+  if (!lower.includes('<html')) return false;
+  if (!lower.includes('<head')) return false;
+  if (!lower.includes('<body')) return false;
+  if (!lower.includes('</html>')) return false;
+  if (lower.includes('todo')) return false;
+  if (/href=["']\/(login|workspace|builder)/i.test(html)) return false;
+  if (html.length > 500_000) return false;
+  return true;
+}
+
 export function checkCredits(accountId: string, planId: string, cost: number): boolean {
   const limit = PLAN_CREDITS[planId] ?? PLAN_CREDITS.free;
   return creditsUsed(accountId) + cost <= limit;
@@ -94,24 +110,54 @@ export function usage(accountId: string): { used: number; limit: number } {
 }
 
 // ---------- pipeline ----------
-export function embeddedCreateProject(
+export async function embeddedCreateProject(
   prompt: string,
   accountId: string,
   planId: string,
-): { jobId: string; projectId: string; status: string } {
+): Promise<{ jobId: string; projectId: string; status: string }> {
   if (!checkCredits(accountId, planId, CREDIT_COSTS.budCreate)) {
     const limit = PLAN_CREDITS[planId] ?? PLAN_CREDITS.free;
     throw new Error(`Limite diário de créditos atingido (${creditsUsed(accountId)}/${limit}). Renova amanhã.`);
   }
 
   const intent = classifyIntent(prompt);
-  const files = generateProjectFiles(intent);
+  let files: Record<string, ProjectFile>;
+  let generatorUsed = 'template';
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60_000);
+    try {
+      const aiResult = await generateSiteWithAI(prompt, undefined, { signal: controller.signal });
+      if (aiResult.ok && isValidHtml(aiResult.html)) {
+        files = {
+          'index.html': {
+            path: 'index.html',
+            content: aiResult.html,
+            language: 'html',
+            updatedAt: nowIso(),
+          },
+        };
+        generatorUsed = 'gemini';
+      } else {
+        files = generateProjectFiles(intent);
+        generatorUsed = 'template-fallback';
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (err) {
+    console.warn('[budEmbedded] Gemini falhou, usando template:', err);
+    files = generateProjectFiles(intent);
+    generatorUsed = 'template-error';
+  }
   const qa = runQa(files, intent);
   const logs: LogEntry[] = [
     buildLogEntry('info', `Job criado para conta ${accountId} (plano ${planId}).`, 'QUEUED', 'BUD Runtime'),
     buildLogEntry('agent', 'Analisando intenção e requisitos do pedido...', 'ANALYZING', 'Product Architect'),
     buildLogEntry('agent', `Arquitetura definida: ${intent.projectType} com ${intent.requiredFeatures.length} funcionalidades.`, 'PLANNING', 'UX/UI Engineer'),
     buildLogEntry('agent', 'Gerando arquivos do projeto...', 'EXECUTING', 'Frontend Engineer'),
+    buildLogEntry('agent', `Gerador utilizado: ${generatorUsed}.`, 'EXECUTING', 'AI Generation Engine'),
     buildLogEntry('agent', 'Compilando bundle estático e validando integridade...', 'BUILDING', 'Performance Engineer'),
   ];
 
@@ -155,6 +201,7 @@ export function embeddedCreateProject(
       currentIntent: intent,
       decisions: [
         `Classificado como ${intent.projectType} (${intent.domain})`,
+        `Gerador utilizado: ${generatorUsed}`,
         `Público definido: ${intent.targetAudience}`,
         `Paleta do nicho: ${intent.colorPalette.primary}`,
       ],
